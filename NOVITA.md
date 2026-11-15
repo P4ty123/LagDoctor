@@ -1,3 +1,15 @@
+## LagDoctor 5.25.21
+
+- Game mode rifatta: in alto lo stato con un grande tasto di accensione (verde quando e' attiva, con il gioco aperto
+  e da quanto tempo), i giochi su tre colonne con la loro icona, e le 19 azioni divise in 4 gruppi (Il gioco,
+  Programmi in background, Windows, Memoria/energia/scheda video). Clic sul nome di una voce per sapere cosa fa;
+  clic sul nome di un gioco per la sua priorita' o per toglierlo dall'elenco.
+- Icone dei giochi: LagDoctor usa l'icona vera di ogni gioco (presa dal suo file .exe o dalla cache di Steam);
+  per 149 giochi famosi c'e' anche il loro logo. Se non trova niente mette la lettera colorata.
+- Analizza gioco: mostra solo i giochi veri, con il loro nome e l'icona: i giochi installati, quelli nelle cartelle
+  dei giochi e i programmi a schermo intero che disegnano con la scheda video. Browser, Discord e gli altri
+  programmi non compaiono (si possono vedere con "Mostra tutti i programmi aperti"). Niente piu' riquadri grigi.
+
 ## LagDoctor 5.25.20
 
 - Fix PC, corretto: se SFC trovava file danneggiati senza ripararli ("found integrity violations" / "ha rilevato
