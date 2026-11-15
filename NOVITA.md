@@ -1,3 +1,11 @@
+## LagDoctor 5.25.20
+
+- Fix PC, corretto: se SFC trovava file danneggiati senza ripararli ("found integrity violations" / "ha rilevato
+  violazioni di integrita'"), LagDoctor poteva dire che i file erano a posto. Ora dice che ci sono file danneggiati
+  e quale fix usare. Il registro di SFC (CBS.log) viene usato solo se l'esito e' certo.
+- Collaudo su Windows vero: provati anche DISM ScanHealth, il controllo del disco e l'ottimizzazione dei dischi
+  (percentuale fluida ed esito giusto).
+
 ## LagDoctor 5.25.19
 
 - Fix PC: l'uscita dei comandi ora si vede esattamente come nel Prompt dei comandi, aggiornata in tempo reale.
