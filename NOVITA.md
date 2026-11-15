@@ -1,3 +1,12 @@
+## LagDoctor 5.25.22
+
+- Icone dei giochi: se il file del gioco non ha un'icona sua, al posto dell'icona bianca generica di Windows ora
+  c'e' la lettera colorata. I giochi Xbox / Game Pass (es. Grounded) usano il loro logo vero, preso dalla cartella
+  del gioco. Le icone vengono rilette da capo.
+- I launcher non compaiono piu' tra i giochi (es. REDlauncher, Minecraft Launcher): vengono tolti anche dagli
+  elenchi gia' salvati.
+- Loghi per 251 giochi famosi (prima 149).
+
 ## LagDoctor 5.25.21
 
 - Game mode rifatta: in alto lo stato con un grande tasto di accensione (verde quando e' attiva, con il gioco aperto
