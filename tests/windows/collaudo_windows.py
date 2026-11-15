@@ -316,25 +316,29 @@ def fixpc_veri():
         except Exception as e:
             esito("Fix PC", f["t"], False, "%s: %s" % (type(e).__name__, str(e)[:200]))
             traceback.print_exc()
-    # SFC vero (solo verifica, non ripara niente): percentuale fluida ed esito letto correttamente
-    fixpc.BY_ID["_sfc"] = {"id": "_sfc", "t": "SFC verifica", "r": False, "ro": True, "res": "sfc",
-                           "steps": [fixpc.cmd("sfc /verifyonly", soft=True)]}
-    viste = []
+    # comandi con barra di avanzamento (non riparano niente): percentuale fluida ed esito chiaro
+    prove = [("SFC (sfc /verifyonly)", "sfc /verifyonly", "sfc", 15, "a posto"),
+             ("DISM ScanHealth", "DISM /Online /Cleanup-Image /ScanHealth", "dism_check", 5, "a posto"),
+             ("Controllo disco (chkdsk C: /scan)", "chkdsk C: /scan", "chk_scan", 3, "non ha errori"),
+             ("Ottimizza dischi (defrag /C /O /U)", "defrag /C /O /U", None, 3, None)]
+    for nome, comando, res, minimo, atteso in prove:
+        fixpc.BY_ID["_p"] = {"id": "_p", "t": nome, "r": False, "ro": True, "res": res,
+                             "steps": [fixpc.cmd(comando, soft=res is not None)]}
+        viste = []
 
-    def live(text):
-        m = re.findall(r"(\d{1,3})\s*%", text)
-        if m and (not viste or viste[-1] != int(m[-1])):
-            viste.append(int(m[-1]))
-    try:
-        r = fixpc.run("_sfc", live=live)
-        ok = r["ok"] and len(set(viste)) >= 15 and "a posto" in r["res"]
-        esito("Fix PC", "SFC: percentuale fluida ed esito chiaro", ok,
-              "%s s, %d percentuali diverse (%s), esito: %s" % (r["secs"], len(set(viste)), viste[:6] + ["..."] + viste[-3:], r["res"]))
-        if not ok:
-            print(r["out"][-2000:], file=sys.stderr)
-    except Exception as e:
-        esito("Fix PC", "SFC: percentuale fluida ed esito chiaro", False, "%s: %s" % (type(e).__name__, str(e)[:200]))
-        traceback.print_exc()
+        def live(text, viste=viste):
+            m = re.findall(r"(\d{1,3})(?:[.,]\d)?\s*(?:%|percent)", text)
+            if m and (not viste or viste[-1] != int(m[-1])):
+                viste.append(int(m[-1]))
+        try:
+            r = fixpc.run("_p", live=live)
+            ok = r["ok"] and len(set(viste)) >= minimo and (atteso is None or atteso in r["res"]) and r["modes"] == ["console"]
+            esito("Fix PC", "%s: percentuale fluida ed esito chiaro" % nome, ok,
+                  "%s s, %d percentuali diverse (%s), esito: %s" % (r["secs"], len(set(viste)), viste[:5] + ["..."] + viste[-3:], r["res"]))
+            print("----- %s -----\n%s\n" % (nome, r["out"][-1200:]), file=sys.stderr)
+        except Exception as e:
+            esito("Fix PC", "%s: percentuale fluida ed esito chiaro" % nome, False, "%s: %s" % (type(e).__name__, str(e)[:200]))
+            traceback.print_exc()
 
 
 def main():
