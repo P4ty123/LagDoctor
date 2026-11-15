@@ -467,3 +467,14 @@ body.frameless .rz{display:block}
 .rz [data-e=bottomright]{right:0;bottom:0;width:10px;height:10px;cursor:se-resize}
 body.frameless.maxed .rz{display:none}
 body.resizing,body.resizing *{user-select:none!important}
+
+/* pulsanti in basso a sinistra: semplici come le voci del menu (niente riquadri, bordi o icone colorate) */
+.side-foot{gap:2px}
+.side-foot button.act.block{background:transparent;border:0;box-shadow:none;color:var(--mut);padding:7px 12px;gap:11px;
+  font-weight:500;font-size:13px;border-radius:10px;transform:none}
+.side-foot button.act.block:hover{background:var(--card2);color:var(--fg);transform:none;box-shadow:none;border:0}
+.side-foot button.act.block .ic{width:18px;height:18px;background:none;box-shadow:none;border:0;color:inherit;opacity:.85}
+.side-foot button.act.block .ic svg{width:16px;height:16px}
+.side-foot button.act.danger{color:#ff8fa3}
+.side-foot button.act.danger .ic{background:none;color:inherit}
+.side-foot button.act.danger:hover{background:rgba(255,92,122,.10);color:#ffb3c1}

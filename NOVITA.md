@@ -1,3 +1,8 @@
+## LagDoctor 5.25.15
+
+- Pulsanti in basso a sinistra (Impostazioni, Aggiornamenti, Cartella report, Ripristina tutto, Esci) piu' semplici:
+  stesso stile delle voci del menu, senza riquadri ne' icone colorate.
+
 ## LagDoctor 5.25.14
 
 - Collaudo automatico prima di ogni versione: su un Windows vero (il computer di GitHub) ogni ottimizzazione sicura
