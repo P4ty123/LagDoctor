@@ -517,3 +517,7 @@ nav a i svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.
 .fx-res.ok{color:var(--ok)}.fx-res.bad{color:var(--bad)}.fx-res.run{color:var(--mut)}
 .spinner.sm{width:14px;height:14px;border-width:2px;margin:0}
 @media (max-width:900px){.fx-wrap{grid-template-columns:1fr}.fx-cats{position:static;flex-direction:row;flex-wrap:wrap}}
+/* icone delle categorie di Ottimizzazioni */
+.cat .r{gap:10px}
+.cat .r .ci{width:20px;height:20px;display:inline-grid;place-items:center;flex:none}
+.cat .r .ci svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}

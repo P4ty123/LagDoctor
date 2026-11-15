@@ -421,6 +421,22 @@ const selectable = (t) => t.kind === "overlay" ? (!t.ignored && !t.manual && !t.
   : !isOn(t) && !t.ignored && !t.manual;
 const OV_CAT = "Overlays";
 
+/* icone delle categorie di Ottimizzazioni: [colore, disegno] */
+const CAT_IC = {
+  "": ["#a0a8c8", '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>'],
+  "Correzioni (impostazioni che tolgono prestazioni)": ["#38bdf8", '<path d="M3 12h4l2-5 4 10 2-5h6"/>'],
+  "CPU ed energia": ["#ffb547", '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'],
+  "Memoria e disco": ["#a78bfa", '<rect x="2.5" y="7" width="19" height="10" rx="1.5"/><path d="M6 17v3M10 17v3M14 17v3M18 17v3"/><rect x="6" y="10" width="4" height="4" rx=".5"/><rect x="14" y="10" width="4" height="4" rx=".5"/>'],
+  "Rete": ["#00d4ff", '<path d="M2 8.5a15 15 0 0 1 20 0"/><path d="M5 12a10 10 0 0 1 14 0"/><path d="M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/>'],
+  "Gioco": ["#2ee59d", '<path d="M6 8h12a4 4 0 0 1 4 4v1.5a3.5 3.5 0 0 1-6.3 2.1L14.5 14h-5l-1.2 1.6A3.5 3.5 0 0 1 2 13.5V12a4 4 0 0 1 4-4z"/><path d="M7 10.5v3M5.5 12h3M16 11h.01M18 13h.01"/>'],
+  "Interfaccia e input": ["#7c5cff", '<rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 7v4"/>'],
+  "Debloat (app preinstallate)": ["#ff8a5c", '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>'],
+  "Sicurezza (PERICOLOSE)": ["#ff5c7a", '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M12 8v5M12 16h.01"/>'],
+  "Overlays": ["#f472b6", '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>'],
+  "Driver NVIDIA": ["#76b900", '<rect x="2" y="6" width="20" height="11" rx="2"/><circle cx="9" cy="11.5" r="2.8"/><path d="M15 9.5h4M15 13.5h4M5 17v2"/>'],
+  "Driver AMD": ["#ff5c5c", '<rect x="2" y="6" width="20" height="11" rx="2"/><circle cx="9" cy="11.5" r="2.8"/><path d="M15 9.5h4M15 13.5h4M5 17v2"/>'],
+};
+const catIcon = (k) => { const i = CAT_IC[k]; return i ? `<span class="ci" style="color:${i[0]}"><svg viewBox="0 0 24 24">${i[1]}</svg></span>` : ""; };
 async function tweaksPage() {
   main().innerHTML = '<div class="loading"><div class="spinner"></div><p>Carico le impostazioni...</p></div>';
   await loadCatalog();
@@ -600,7 +616,7 @@ function renderTweaks() {
     const n = key ? fl.filter((t) => t.cat === key).length : fl.length;
     const cnt = myth ? `${items.filter((t) => isOn(t)).length} attive` : `${on}/${tot}`;
     const pct = myth ? 0 : Math.round(100 * on / Math.max(tot, 1));
-    return `<div class="cat ${S.twCat === key ? "on" : ""} ${n ? "" : "empty"}" data-cat="${esc(key)}"><div class="r">${warn ? '<span class="warn" title="ci sono voci da correggere"></span>' : ""}<b>${esc(label)}</b><span class="c">${cnt}</span></div>
+    return `<div class="cat ${S.twCat === key ? "on" : ""} ${n ? "" : "empty"}" data-cat="${esc(key)}"><div class="r">${warn ? '<span class="warn" title="ci sono voci da correggere"></span>' : ""}${catIcon(key)}<b>${esc(label)}</b><span class="c">${cnt}</span></div>
       <div class="p"><i style="width:${pct}%"></i></div></div>`;
   };
   $("#cats").innerHTML = catRow("", "Tutte le categorie", act) + order.map((c) => catRow(c, c, act.filter((t) => t.cat === c))).join("");

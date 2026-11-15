@@ -1,3 +1,7 @@
+## LagDoctor 5.25.18
+
+- Ottimizzazioni: ogni categoria ha la sua icona colorata (la scheda video e' verde con NVIDIA, rossa con AMD).
+
 ## LagDoctor 5.25.17
 
 - Nuova scheda Fix PC: 53 comandi veri di Windows per sistemare i problemi piu' comuni, divisi in 10 categorie
