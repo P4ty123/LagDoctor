@@ -1,0 +1,48 @@
+# Collaudo di LagDoctor: simulato (Linux) e su un Windows VERO (computer usa e getta di GitHub).
+# - usato da "Crea versione" prima di pubblicare (se fallisce, la versione non viene pubblicata)
+# - parte da solo con una modifica sul branch test/collaudo, o a mano (Actions > Collaudo > Run workflow)
+name: Collaudo
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  push:
+    branches: [test/collaudo]
+
+jobs:
+  simulato:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Componenti
+        run: python -m pip install psutil==7.0.0
+      - name: Collaudo simulato (tutte le voci, game mode, overlay, avvio automatico)
+        run: python tests/sim/run_all.py
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Componenti
+        run: python -m pip install psutil==7.0.0
+      - name: Windows di prova
+        shell: pwsh
+        run: |
+          Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, OSLanguage | Format-List
+          powercfg /getactivescheme
+      - name: Collaudo su Windows vero (applica / verifica / annulla ogni voce)
+        run: python tests/windows/collaudo_windows.py collaudo
+      - name: Risultati
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: collaudo-windows
+          path: collaudo/collaudo-windows.txt

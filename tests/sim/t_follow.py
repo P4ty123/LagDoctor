@@ -1,0 +1,15 @@
+import os as _os, sys as _sys  # collaudo simulato: Windows finto (mock) + codice di LagDoctor
+_HERE = _os.path.dirname(_os.path.abspath(__file__))
+_sys.path.insert(0, _os.path.abspath(_os.path.join(_HERE, "..", "..")))
+_sys.path.insert(0, _os.path.join(_HERE, "mock"))
+exec(open("audit_tweaks.py").read().split("SKIP = {")[0])
+for tid in ("boost_aggr", "core_parking"):
+    make_inactive(T.BY_ID[tid])
+print("boost prima:", T.BY_ID["boost_aggr"].status())
+print(T.apply_one("boost_aggr"), T.apply_one("core_parking"))
+print("piano prima:", W["scheme"])
+print("plan_ultimate:", T.apply_one("plan_ultimate"), "-> piano", W["schemes"][W["scheme"]])
+print("boost nel nuovo piano:", T.BY_ID["boost_aggr"].status(), "| core parking:", T.BY_ID["core_parking"].status())
+assert T.BY_ID["boost_aggr"].status() and T.BY_ID["core_parking"].status() and T.BY_ID["plan_ultimate"].status()
+T.revert_one("plan_ultimate"); print("annullato -> piano", W["schemes"][W["scheme"]], "| boost:", T.BY_ID["boost_aggr"].status())
+print("TUTTO OK")
