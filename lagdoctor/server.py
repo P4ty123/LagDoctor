@@ -922,20 +922,8 @@ def _cpu_util():
         return sum(x * k for (_t, x), k in zip(hist, w)) / sum(w)
 
 
-def _cpu_util_locked():
-    """Utilizzo della CPU come in Gestione attivita' ('% utilita' processore' di Windows).
-    Riserva: calcolo dai tempi della CPU tra una lettura e l'altra (sempre i miei, non quelli condivisi di psutil)."""
-    q = _CPU["q"]
-    if q is None:
-        q = _CPU["q"] = pdh.Query({"util": r"\Processor Information(_Total)\% Processor Utility",
-                                   "time": r"\Processor Information(_Total)\% Processor Time"})
-        q.collect()
-        time.sleep(0.25)
-    if q.ok:
-        v = q.collect()
-        val = v.get("util", v.get("time"))
-        if isinstance(val, (int, float)):
-            return max(0.0, min(100.0, val))
+def _cpu_times_util():
+    """utilizzo dai tempi della CPU (come '% tempo processore'), tra questa lettura e la precedente."""
     t = psutil.cpu_times()
     prev, _CPU["times"] = _CPU["times"], t
     if prev is None:
@@ -945,6 +933,35 @@ def _cpu_util_locked():
     tot = sum(t) - sum(prev)
     idle = t.idle - prev.idle
     return max(0.0, min(100.0, 100.0 * (1 - idle / tot))) if tot > 0 else None
+
+
+def _cpu_util_locked():
+    """Utilizzo della CPU come in Gestione attivita' ('% utilita' processore' di Windows, che tiene conto anche
+    della frequenza). Su alcuni PC quel contatore di Windows si guasta e segna 100% anche a riposo (visto su un
+    mini PC Intel N95): lo confronto sempre con il tempo di CPU vero e, se non torna, uso quello."""
+    q = _CPU["q"]
+    if q is None:
+        q = _CPU["q"] = pdh.Query({"util": r"\Processor Information(_Total)\% Processor Utility",
+                                   "time": r"\Processor Information(_Total)\% Processor Time"})
+        q.collect()
+        time.sleep(0.25)
+    ref = _cpu_times_util()
+    if q.ok:
+        v = q.collect()
+        util, ptime = v.get("util"), v.get("time")
+        base = ref if ref is not None else ptime
+        if isinstance(util, (int, float)) and util >= 0:
+            # con il turbo la "utilita'" puo' superare il tempo di CPU (frequenza piu' alta della base), ma non
+            # di molto: oltre 2,5 volte (+15) il contatore e' guasto
+            if base is None or util <= base * 2.5 + 15:
+                return max(0.0, min(100.0, util))
+            if not _CPU.get("warned"):
+                _CPU["warned"] = True
+                log_error_text("Contatore '%% Processor Utility' di Windows inaffidabile (%.0f%% contro %.0f%% di tempo "
+                               "CPU): uso il tempo di CPU" % (util, base))
+        if isinstance(ptime, (int, float)) and ref is None:
+            return max(0.0, min(100.0, ptime))
+    return ref
 
 
 def _sys_sensors():

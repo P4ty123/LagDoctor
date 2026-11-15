@@ -29,6 +29,7 @@ PROVE = [
     ("t_eco.py", "processori: modalita' efficienza"),
     ("t_fixpc.py", "Fix PC: catalogo dei comandi ed esecuzione"),
     ("t_giochi.py", "Analizza gioco: giochi aperti e loghi dei giochi"),
+    ("t_cpu.py", "utilizzo CPU della Panoramica (contatore di Windows guasto)"),
     ("t_completa.py", "voci gia' applicate completate dalle versioni nuove (Nagle + TcpDelAckTicks)"),
 ]
 
