@@ -2,6 +2,8 @@
 # Parte a ogni modifica caricata su "main": se la versione scritta in lagdoctor/__init__.py non e' ancora
 # pubblicata, costruisce e pubblica la Release "vX.Y.Z" (creando anche l'etichetta). Se e' gia' pubblicata, non fa
 # niente. Avvio a mano (Actions > Crea versione > Run workflow): costruisce soltanto, senza pubblicare.
+# Prima di tutto gira il Collaudo (.github/workflows/collaudo.yml): ogni ottimizzazione viene applicata, verificata
+# e annullata su un Windows vero. Se qualcosa non va, la versione NON viene pubblicata.
 name: Crea versione
 
 on:
@@ -13,7 +15,12 @@ permissions:
   contents: write
 
 jobs:
+  # prima il collaudo (simulato + su Windows vero): se fallisce, niente versione
+  collaudo:
+    uses: ./.github/workflows/collaudo.yml
+
   build:
+    needs: collaudo
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

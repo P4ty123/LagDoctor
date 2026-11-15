@@ -1,3 +1,15 @@
+## LagDoctor 5.25.14
+
+- Collaudo automatico prima di ogni versione: su un Windows vero (il computer di GitHub) ogni ottimizzazione sicura
+  viene applicata, verificata e annullata, controllando che Windows torni esattamente com'era; le voci rischiose e
+  di rete vengono lette; viene controllata la sintassi di tutti i comandi PowerShell; vengono provate le funzioni
+  (processi all'avvio, manutenzione della game mode, Esplora risorse, timer, verifica completa). In piu' gira il
+  collaudo simulato di tutte le voci, game mode e overlay. Se qualcosa non va, la versione NON viene pubblicata.
+- Corretto (trovato dal collaudo su Windows vero): per TRIM, HPET, compressione della memoria, TCP Auto-Tuning e
+  le altre voci a comando, "Annulla" portava l'impostazione nello stato opposto anche se era gia' a posto prima
+  di LagDoctor. Ora rimette sempre lo stato di prima. Lo stesso per le voci di bcdedit (dynamic tick, hypervisor):
+  se avevano un valore, viene rimesso quello invece di cancellarlo.
+
 ## LagDoctor 5.25.13
 
 - Finestra senza barra di Edge: i crash di WebView2 visti sul PC sono occasionali, quindi LagDoctor non passa piu'
