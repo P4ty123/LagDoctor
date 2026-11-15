@@ -1,3 +1,10 @@
+## LagDoctor 5.25.23
+
+- "Disattiva algoritmo di Nagle" ora imposta anche TcpDelAckTicks = 0 (Windows conferma subito i dati ricevuti
+  invece di aspettare fino a 200 ms), oltre a TcpAckFrequency e TCPNoDelay. Sui PC dove la voce era gia' attiva
+  il valore nuovo viene aggiunto da solo all'avvio di LagDoctor (vale dal prossimo riavvio); "Annulla" rimette
+  tutto com'era. Serve solo ai giochi che usano TCP.
+
 ## LagDoctor 5.25.22
 
 - Icone dei giochi: se il file del gioco non ha un'icona sua, al posto dell'icona bianca generica di Windows ora

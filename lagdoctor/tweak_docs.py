@@ -270,7 +270,9 @@ doc("nic_power",
     "Evita picchi di ping e brevi disconnessioni, soprattutto con il Wi-Fi.",
     "Qualche watt in piu'; sui portatili la batteria dura un po' meno.")
 doc("nagle",
-    "L'algoritmo di Nagle raggruppa i piccoli pacchetti TCP per inviarne meno.",
+    "L'algoritmo di Nagle raggruppa i piccoli pacchetti TCP per inviarne meno, e Windows aspetta fino a 200 ms "
+    "prima di confermare i dati ricevuti. LagDoctor imposta su ogni scheda di rete in uso TcpAckFrequency = 1 e "
+    "TCPNoDelay = 1 (niente raggruppamento) e TcpDelAckTicks = 0 (conferma subito, senza attesa).",
     "Nei giochi che usano TCP (alcuni MMO, giochi vecchi) i comandi partono subito invece di aspettare.",
     "La maggior parte degli sparatutto usa UDP: nessun effetto. Un po' piu' di traffico di rete.")
 doc("net_throttle",

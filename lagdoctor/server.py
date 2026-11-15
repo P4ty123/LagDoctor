@@ -346,6 +346,10 @@ def job_boot(job, hw=None):
     if drv.get("ok"):
         probs = probs + drv.get("problems", [])
     STATE["sys_problems"] = probs
+    try:  # voci gia' applicate a cui questa versione ha aggiunto dei valori
+        tweaks.complete_applied()
+    except Exception:
+        log_error()
     job.msg("Controllo lo stato delle impostazioni...")
     refresh_statuses(job)
     return {"sysinfo": info, "problems": probs}

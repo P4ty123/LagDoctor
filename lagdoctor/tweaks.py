@@ -584,6 +584,7 @@ def _nagle_values():
         if ip and ip != "0.0.0.0":
             vals.append(("HKLM", base + "\\" + sub, "TcpAckFrequency", DWORD, 1))
             vals.append(("HKLM", base + "\\" + sub, "TCPNoDelay", DWORD, 1))
+            vals.append(("HKLM", base + "\\" + sub, "TcpDelAckTicks", DWORD, 0))  # conferma subito (default 200 ms)
     return vals
 
 
@@ -758,7 +759,8 @@ CATALOG = [
              after_check="Windows non ha accettato la modifica per la scheda di rete (il driver potrebbe non "
                          "permetterlo). Prova da Gestione dispositivi > Schede di rete > scheda > Risparmio energia."),
     RegTweak("nagle", "Rete", "Disattiva algoritmo di Nagle",
-             "Invia subito i piccoli pacchetti TCP. Aiuta solo i giochi che usano TCP (alcuni MMO, vecchi "
+             "Invia subito i piccoli pacchetti TCP e conferma subito quelli ricevuti (TcpAckFrequency, TCPNoDelay, "
+             "TcpDelAckTicks). Aiuta solo i giochi che usano TCP (alcuni MMO, vecchi "
              "giochi); la maggior parte degli sparatutto usa UDP e non cambia nulla.", "bassa", risk=1,
              values=_nagle_values, recommend=lambda s: None),
     RegTweak("net_throttle", "Rete", "Disattiva Network Throttling",
@@ -1548,6 +1550,40 @@ def apply_one(tid):
     if isinstance(t, PowerPlanTweak) or getattr(t, "changes_plan", False):
         follow_power_settings()
     return "applicata" + (" (serve il riavvio)" if t.reboot else "")
+
+
+def complete_applied():
+    """Voci gia' applicate a cui una versione nuova di LagDoctor ha aggiunto dei valori (es. TcpDelAckTicks in
+    'Disattiva algoritmo di Nagle', o una scheda di rete nuova): scrive i valori mancanti salvando il valore di
+    prima nel backup, cosi' 'Annulla' rimette tutto com'era. Ritorna le voci completate."""
+    state = load_state()
+    done = []
+    for tid, item in state.items():
+        t = BY_ID.get(tid)
+        if not isinstance(t, RegTweak) or not isinstance(item, dict) or not isinstance(item.get("backup"), dict):
+            continue
+        reg = item["backup"].setdefault("reg", [])
+        have = {(h.upper(), p.lower(), n.lower()) for h, p, n, *_ in reg}
+        try:
+            vals = t.values()
+        except Exception:
+            continue
+        added = False
+        for h, p, n, typ, v in vals:
+            if (h.upper(), p.lower(), n.lower()) in have:
+                continue
+            try:
+                prev, ptype = reg_read(h, p, n)
+                reg_write(h, p, n, typ, v)
+            except Exception:
+                continue
+            reg.append([h, p, n, ptype, prev])
+            added = True
+        if added:
+            done.append(tid)
+    if done:
+        save_state(state)
+    return done
 
 
 def revert_one(tid):
