@@ -174,6 +174,8 @@ def xbox():
                     name = m.group(1)
             except OSError:
                 pass
+            if LAUNCHERS.search(name):  # es. "Minecraft Launcher": non e' un gioco
+                continue
             g = _game("xbox", name, name, content)
             if g:
                 games.append(g)
@@ -184,7 +186,7 @@ def xbox():
 PUBLISHERS = re.compile(r"electronic arts|blizzard|riot games|rockstar games|bethesda|square enix|bandai|"
                         r"capcom|cd projekt|2k|activision|sega|warner bros|focus|giants software|paradox|"
                         r"techland|mojang|hoyoverse|cognosphere|nexon|wargaming|embark", re.I)
-LAUNCHERS = re.compile(r"\b(launcher|app|client|desktop|battle\.net|ea app|origin|riot client|social club)\s*$", re.I)
+LAUNCHERS = re.compile(r"(launcher|\bapp|\bclient|\bdesktop|battle\.net|ea app|\borigin|riot client|social club)\s*$", re.I)
 
 
 def installed_programs():

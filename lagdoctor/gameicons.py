@@ -14,7 +14,7 @@ import threading
 
 from . import paths
 
-DIR = os.path.join(paths.DATA_DIR, "icone")
+DIR = os.path.join(paths.DATA_DIR, "icone2")  # "icone2": rifatte senza l'icona generica di Windows
 CREATE_NO_WINDOW = 0x08000000
 SKIP_EXE = re.compile(r"crash|unins|setup|install|redist|vc_?redist|dxsetup|directx|easyanticheat|eac|beservice|battleye|"
                       r"report|helper|launcher|bootstrap|updater|update|prereq|cefprocess|webhelper|dotnet|vcredist|"
@@ -34,6 +34,10 @@ public static class LdIcon {
   static extern void SHCreateItemFromParsingName(string path, IntPtr pbc, [MarshalAs(UnmanagedType.LPStruct)] Guid riid,
                                                  [MarshalAs(UnmanagedType.Interface)] out IShellItemImageFactory ppv);
   [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr h);
+  [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+  static extern int ExtractIconExW(string file, int index, IntPtr[] large, IntPtr[] small, int n);
+  // quante icone ha il file: 0 = nessuna (Windows mostrerebbe la sua icona generica, bianca)
+  public static int Count(string exe) { return ExtractIconExW(exe, -1, null, null, 0); }
   public static void Save(string exe, string png, int size) {
     IShellItemImageFactory f;
     SHCreateItemFromParsingName(exe, IntPtr.Zero, typeof(IShellItemImageFactory).GUID, out f);
@@ -53,6 +57,7 @@ public static class LdIcon {
 }
 "@
 foreach ($j in (Get-Content -Raw -Encoding UTF8 $args[0] | ConvertFrom-Json)) {
+  if ([LdIcon]::Count($j.exe) -le 0) { 'NOICON|' + $j.png; continue }
   try { [LdIcon]::Save($j.exe, $j.png, 128); 'OK|' + $j.png }
   catch {
     try { $i = [System.Drawing.Icon]::ExtractAssociatedIcon($j.exe); $i.ToBitmap().Save($j.png, [System.Drawing.Imaging.ImageFormat]::Png); 'OK|' + $j.png }
@@ -146,6 +151,40 @@ def _steam_icon(game):
     return None
 
 
+def _xbox_logo(game):
+    """giochi Xbox / Game Pass: il loro .exe spesso non ha icona, il logo vero e' nella cartella Content."""
+    d = game.get("dir") or ""
+    cfg = os.path.join(d, "MicrosoftGame.config")
+    if not os.path.isfile(cfg):
+        return None
+    try:
+        text = open(cfg, encoding="utf-8", errors="ignore").read()
+    except OSError:
+        return None
+    for attr in ("Square480x480Logo", "Square150x150Logo", "StoreLogo", "Square44x44Logo"):
+        m = re.search(r'\b%s="([^"]+)"' % attr, text)
+        if not m:
+            continue
+        rel = m.group(1).replace("/", os.sep)
+        f = os.path.join(d, rel)
+        if os.path.isfile(f):
+            return f
+        stem, ext = os.path.splitext(f)  # varianti come Logo.scale-200.png: la piu' grande
+        alts = sorted(glob.glob(glob.escape(stem) + ".scale-*" + ext), key=lambda x: int(re.sub(r"\D", "", x.rsplit("scale-", 1)[1]) or 0))
+        if alts:
+            return alts[-1]
+    return None
+
+
+def _log(text):
+    try:
+        os.makedirs(DIR, exist_ok=True)
+        with open(os.path.join(DIR, "registro.txt"), "a", encoding="utf-8") as f:
+            f.write(text.rstrip() + "\n")
+    except OSError:
+        pass
+
+
 def extract(items, timeout=120):
     """items: [(id, exe)]. Salva le icone; ritorna gli id riusciti."""
     if os.name != "nt" or not items:
@@ -176,6 +215,9 @@ def extract(items, timeout=120):
         except OSError:
             pass
     done = {os.path.normcase(l.split("|")[1]) for l in out.splitlines() if l.startswith("OK|")}
+    for l in out.splitlines():
+        if not l.startswith("OK|"):
+            _log(l)
     return [gid for gid, _exe in items if os.path.normcase(path_for(gid)) in done and have(gid)]
 
 
@@ -190,10 +232,15 @@ def ensure(games, wait=False):
         try:
             items = []
             for g in todo:
+                logo = _xbox_logo(g)
+                if logo:
+                    _copy_jpg(logo, g["id"])
+                    continue
                 exe = find_exe(g)
                 if exe:
                     items.append((g["id"], exe))
                 else:
+                    _log("nessun eseguibile trovato: %s (%s)" % (g.get("name"), g.get("dir")))
                     st = _steam_icon(g)
                     if st:
                         _copy_jpg(st, g["id"])

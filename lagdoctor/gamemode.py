@@ -389,10 +389,12 @@ def refresh_games(c):
                 g["anticheat"] = G.anticheat_in_dir(g.get("dir"))
             except Exception:
                 g["anticheat"] = None
-    # giochi disinstallati (cartella sparita): li tolgo, tranne quelli aggiunti a mano
+    # giochi disinstallati (cartella sparita) e launcher trovati per errore dalle versioni vecchie (es. REDlauncher):
+    # li tolgo, tranne quelli aggiunti a mano
     before = len(c["games"])
-    c["games"] = [g for g in c["games"] if g.get("match") != "dir" or os.path.isdir(g.get("dir") or "")
-                  or g.get("source") == "manuale"]
+    c["games"] = [g for g in c["games"] if g.get("source") == "manuale" or
+                  ((g.get("match") != "dir" or os.path.isdir(g.get("dir") or "")) and
+                   not (g.get("source") in ("pc", "xbox") and G.LAUNCHERS.search(g.get("name") or "")))]
     c["games"].sort(key=lambda g: g["name"].lower())
     return max(0, added - (before - len(c["games"])))
 

@@ -304,8 +304,14 @@ def f_icone():
             os.remove(gameicons.path_for(gid))
         except OSError:
             pass
-    ok = gameicons.extract(prove, timeout=180)
-    assert set(ok) == {g for g, _e in prove}, "icone non estratte: %s" % sorted({g for g, _e in prove} - set(ok))
+    senza = ("t-whoami", os.path.join(win, "System32", "whoami.exe"))  # programma senza icona propria
+    try:
+        os.remove(gameicons.path_for(senza[0]))
+    except OSError:
+        pass
+    ok = gameicons.extract(prove + [senza], timeout=180)
+    assert set(ok) >= {g for g, _e in prove}, "icone non estratte: %s" % sorted({g for g, _e in prove} - set(ok))
+    assert senza[0] not in ok, "per un programma senza icona e' stata salvata l'icona generica di Windows"
     info = []
     for gid, _e in prove:
         data = open(gameicons.path_for(gid), "rb").read()
