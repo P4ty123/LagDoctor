@@ -53,3 +53,17 @@ assert C._exit_code(scr) == 0 and C.MARK not in C._clean(scr) and C._clean(scr).
 assert C._exit_code("in corso 45%") is None
 assert C._exit_code("x\n" + C.MARK + "-2146498529") == -2146498529
 print("OK console nascosta")
+
+# SFC: ogni messaggio (inglese e italiano) deve dare l'esito giusto
+casi = [("Windows Resource Protection did not find any integrity violations.", True),
+        ("Protezione risorse di Windows non ha rilevato violazioni di integrità.", True),
+        ("Windows Resource Protection found integrity violations.", False),
+        ("Protezione risorse di Windows ha rilevato violazioni di integrità.", False),
+        ("Windows Resource Protection found corrupt files and successfully repaired them.", True),
+        ("Protezione risorse di Windows ha rilevato file danneggiati e li ha ripristinati correttamente.", True),
+        ("Windows Resource Protection found corrupt files but was unable to fix some of them.", False),
+        ("Windows Resource Protection could not perform the requested operation.", False)]
+for testo, atteso in casi:
+    good, msg = F._sfc("Verification 100% complete.\n" + testo)
+    assert good is atteso, (testo, good, msg)
+print("OK esiti di SFC")

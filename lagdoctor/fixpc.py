@@ -413,11 +413,12 @@ def _sfc_cbs(since):
                        "di Windows (DISM)\", riavvia e poi esegui di nuovo SFC.")
     if any("Repaired file" in l or "Repairing corrupted file" in l for l in sr):
         return True, "SFC ha trovato file danneggiati e li ha riparati tutti. Riavvia il PC per completare."
-    if any("Verify complete" in l for l in sr):
-        if any("Cannot verify component files" in l or "corrupt" in l.lower() for l in sr):
-            return False, "SFC ha trovato file danneggiati: esegui \"Riparazione completa di Windows\"."
+    bad = any(x in l for l in sr for x in ("Cannot verify", "do not match", "orrupt", "violation"))
+    if bad:
+        return False, "SFC ha trovato file danneggiati: esegui \"Riparazione completa di Windows\"."
+    if any("Verify complete" in l for l in sr) and any("Repairing 0 components" in l for l in sr):
         return True, "SFC non ha trovato nessun file danneggiato: i file di sistema di Windows sono a posto."
-    return None
+    return None  # non e' chiaro: meglio non dire niente che dire una cosa sbagliata
 
 
 def _sfc(out, since=None):
@@ -428,6 +429,9 @@ def _sfc(out, since=None):
     if _has(out, "correggerne alcuni", "unable to fix some"):
         return False, ("SFC ha trovato file danneggiati ma non e' riuscito a ripararli tutti: esegui \"Ripara l'immagine "
                        "di Windows (DISM)\", riavvia e poi esegui di nuovo SFC.")
+    if _has(out, "found integrity violations", "rilevato violazioni di integrit", "rilevato delle violazioni"):
+        return False, ("SFC ha trovato file di sistema danneggiati: esegui \"Riparazione completa di Windows\" "
+                       "per ripararli (DISM e poi SFC).")
     if _has(out, "riparazione del sistema in sospeso", "repair pending"):
         return False, "C'e' una riparazione di Windows in sospeso: riavvia il PC e poi esegui di nuovo SFC."
     if _has(out, "eseguire l'operazione richiesta", "could not perform the requested operation"):

@@ -317,10 +317,10 @@ def fixpc_veri():
             esito("Fix PC", f["t"], False, "%s: %s" % (type(e).__name__, str(e)[:200]))
             traceback.print_exc()
     # comandi con barra di avanzamento (non riparano niente): percentuale fluida ed esito chiaro
-    prove = [("SFC (sfc /verifyonly)", "sfc /verifyonly", "sfc", 15, "a posto"),
+    prove = [("SFC (sfc /verifyonly)", "sfc /verifyonly", "sfc", 15, "sfc"),
              ("DISM ScanHealth", "DISM /Online /Cleanup-Image /ScanHealth", "dism_check", 5, "a posto"),
              ("Controllo disco (chkdsk C: /scan)", "chkdsk C: /scan", "chk_scan", 3, "non ha errori"),
-             ("Ottimizza dischi (defrag /C /O /U)", "defrag /C /O /U", None, 3, None)]
+             ("Ottimizza dischi (defrag /C /O /U)", "defrag /C /O /U", None, 0, None)]  # sul disco virtuale non c'e' niente da fare
     for nome, comando, res, minimo, atteso in prove:
         fixpc.BY_ID["_p"] = {"id": "_p", "t": nome, "r": False, "ro": True, "res": res,
                              "steps": [fixpc.cmd(comando, soft=res is not None)]}
@@ -332,7 +332,13 @@ def fixpc_veri():
                 viste.append(int(m[-1]))
         try:
             r = fixpc.run("_p", live=live)
-            ok = r["ok"] and len(set(viste)) >= minimo and (atteso is None or atteso in r["res"]) and r["modes"] == ["console"]
+            if atteso == "sfc":  # l'esito deve corrispondere a quello che SFC ha scritto davvero
+                trovati = "found integrity violations" in r["out"] or "corrupt files" in r["out"]
+                pulito = "did not find any integrity violations" in r["out"]
+                giusto = (trovati and "danneggiati" in r["res"] and not r["ok"]) or (pulito and "a posto" in r["res"] and r["ok"])
+                ok = giusto and len(set(viste)) >= minimo and r["modes"] == ["console"]
+            else:
+                ok = r["ok"] and len(set(viste)) >= minimo and (atteso is None or atteso in r["res"]) and r["modes"] == ["console"]
             esito("Fix PC", "%s: percentuale fluida ed esito chiaro" % nome, ok,
                   "%s s, %d percentuali diverse (%s), esito: %s" % (r["secs"], len(set(viste)), viste[:5] + ["..."] + viste[-3:], r["res"]))
             print("----- %s -----\n%s\n" % (nome, r["out"][-1200:]), file=sys.stderr)
