@@ -1,3 +1,9 @@
+## LagDoctor 5.25.24
+
+- Panoramica, corretto: su alcuni PC (es. mini PC Intel N95) l'utilizzo della CPU segnava 100% anche a riposo,
+  perche' il contatore di Windows '% utilita' processore' si guasta. Ora viene sempre confrontato con il tempo di
+  CPU vero e, se non torna, LagDoctor usa quello.
+
 ## LagDoctor 5.25.23
 
 - "Disattiva algoritmo di Nagle" ora imposta anche TcpDelAckTicks = 0 (Windows conferma subito i dati ricevuti
