@@ -45,3 +45,11 @@ F.BY_ID["t"]["steps"] = [F.cmd("A"), F.cmd("B", soft=True), F.cmd("C")]
 r = F.run("t")
 assert seq == ["A", "B", "C"] and r["ok"], (seq, r)
 print("OK fix pc: %d fix in %d categorie" % (len(ids), len(cat["cats"])))
+
+# console nascosta: riga finale col codice di uscita
+from lagdoctor import conrun as C  # noqa: E402
+scr = "Verifica 100% completata.\n\nProtezione risorse di Windows non ha rilevato violazioni.\n" + C.MARK + "0\n"
+assert C._exit_code(scr) == 0 and C.MARK not in C._clean(scr) and C._clean(scr).endswith("violazioni.")
+assert C._exit_code("in corso 45%") is None
+assert C._exit_code("x\n" + C.MARK + "-2146498529") == -2146498529
+print("OK console nascosta")

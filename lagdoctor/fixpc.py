@@ -332,7 +332,7 @@ def _cmdline(step, width):
             script = "[Console]::OutputEncoding=[Text.Encoding]::UTF8; " + script
         enc = base64.b64encode(script.encode("utf-16-le")).decode()
         return "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + enc
-    return "cmd /d /c " + c
+    return c if width == conrun.WIDTH - 5 else "cmd /d /c " + c  # in console il comando gira gia' dentro cmd
 
 
 def _popen(step):
@@ -394,7 +394,33 @@ DISM_ERR = {0x800F081F: "DISM non trova i file per riparare: controlla la connes
             5: "accesso negato: serve LagDoctor avviato come amministratore."}
 
 
-def _sfc(out):
+def _sfc_cbs(since):
+    """esito di SFC letto dal suo registro (CBS.log, in inglese su ogni Windows): serve se il messaggio non si legge."""
+    f = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), r"Logs\CBS\CBS.log")
+    try:
+        with open(f, "rb") as fh:
+            fh.seek(0, 2)
+            fh.seek(max(0, fh.tell() - 8 * 1024 * 1024))
+            data = fh.read().decode("utf-8", "replace")
+    except OSError:
+        return None
+    t0 = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(since - 5))
+    sr = [l for l in data.splitlines() if "[SR]" in l and l[:19] >= t0]
+    if not sr:
+        return None
+    if any("Cannot repair member file" in l for l in sr):
+        return False, ("SFC ha trovato file danneggiati ma non e' riuscito a ripararli tutti: esegui \"Ripara l'immagine "
+                       "di Windows (DISM)\", riavvia e poi esegui di nuovo SFC.")
+    if any("Repaired file" in l or "Repairing corrupted file" in l for l in sr):
+        return True, "SFC ha trovato file danneggiati e li ha riparati tutti. Riavvia il PC per completare."
+    if any("Verify complete" in l for l in sr):
+        if any("Cannot verify component files" in l or "corrupt" in l.lower() for l in sr):
+            return False, "SFC ha trovato file danneggiati: esegui \"Riparazione completa di Windows\"."
+        return True, "SFC non ha trovato nessun file danneggiato: i file di sistema di Windows sono a posto."
+    return None
+
+
+def _sfc(out, since=None):
     if _has(out, "non ha rilevato violazioni", "did not find any integrity violations"):
         return True, "SFC non ha trovato nessun file danneggiato: i file di sistema di Windows sono a posto."
     if _has(out, "li ha ripristinati", "successfully repaired"):
@@ -406,7 +432,8 @@ def _sfc(out):
         return False, "C'e' una riparazione di Windows in sospeso: riavvia il PC e poi esegui di nuovo SFC."
     if _has(out, "eseguire l'operazione richiesta", "could not perform the requested operation"):
         return False, "SFC non e' riuscito a fare il controllo: riavvia il PC e riprova (se succede ancora, prova in modalita' provvisoria)."
-    return None, "SFC ha finito: leggi il suo messaggio qui sopra."
+    r = _sfc_cbs(since) if since else None
+    return r if r else (None, "SFC ha finito, ma non riesco a leggere il suo esito: guarda il messaggio qui sopra.")
 
 
 def _dism(out, code, restore):
@@ -422,17 +449,17 @@ def _dism(out, code, restore):
     return True, "DISM non ha trovato nessun danneggiamento: l'immagine di Windows e' a posto."
 
 
-def _summary(f, ok, failed, out, codes=()):
+def _summary(f, ok, failed, out, codes=(), since=None):
     """frase finale mostrata sotto il fix. Ritorna (ok, testo): alcuni comandi finiscono senza errori ma trovano problemi."""
     kind = f.get("res")
     last = codes[-1] if codes else None
     if kind == "sfc":
-        good, msg = _sfc(out)
+        good, msg = _sfc(out, since)
         return (ok if good is None else good), msg
     if kind == "full":
         if len(codes) < 2:  # DISM fallito: SFC non e' partito
             return False, _dism(out, codes[0] if codes else -1, True)[1] + " SFC non e' stato eseguito."
-        good, msg = _sfc(out)
+        good, msg = _sfc(out, since)
         return (ok if good is None else good), "DISM ha completato la riparazione. " + msg
     if kind in ("dism_check", "dism_restore"):
         return _dism(out, last if last is not None else -1, kind == "dism_restore")
@@ -473,8 +500,8 @@ def _run_step(step, out, push, stop):
             code, text = conrun.run(_cmdline(step, conrun.WIDTH - 5), screen, stop=stop, timeout=step.get("timeout", 1800))
             out.set_live(start, text)
             return code
-        except conrun.Failed:
-            out.modes[-1] = "pipe"  # console non utilizzabile: uso la pipe
+        except conrun.Failed as e:
+            out.modes[-1] = "pipe (%s)" % e  # console non utilizzabile: uso la pipe
             return _run_pipe(step, out, push, stop)
     out.modes.append("pipe")
     return _run_pipe(step, out, push, stop)
@@ -569,6 +596,6 @@ def run(fid, job=None, live=None):
             failed = (step["c"], "interrotto")
     text = out.text(1000)
     ok = failed is None
-    ok, res = _summary(f, ok, failed, text, codes)
+    ok, res = _summary(f, ok, failed, text, codes, t0)
     return {"id": fid, "ok": ok, "out": text, "res": res, "reboot": bool(f["r"] and ok), "modes": out.modes,
             "secs": round(time.time() - t0, 1)}

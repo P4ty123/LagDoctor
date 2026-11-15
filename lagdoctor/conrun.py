@@ -97,56 +97,81 @@ def _screen(h):
     return "\n".join(rows).rstrip()
 
 
+MARK = "__LDFINE__"
+
+
+def _clean(text):
+    """toglie la riga col codice di uscita aggiunta da LagDoctor."""
+    rows = text.split("\n")
+    for i in range(len(rows) - 1, -1, -1):
+        if rows[i].startswith(MARK):
+            return "\n".join(rows[:i]).rstrip()
+    return text
+
+
+def _exit_code(text):
+    for row in reversed(text.split("\n")):
+        if row.startswith(MARK):
+            try:
+                return int(row[len(MARK):].strip())
+            except ValueError:
+                return -1
+    return None
+
+
 def run(cmdline, on_text, stop=None, timeout=1800, interval=0.3):
     """Avvia cmdline in una console nascosta; on_text(testo) riceve lo schermo mentre gira.
-    Ritorna (codice di uscita, testo finale). Solleva Failed se la console non e' utilizzabile."""
+    La console resta aperta alla fine (pause) finche' LagDoctor non ha letto tutto; il codice di uscita arriva
+    nell'ultima riga. Ritorna (codice di uscita, testo finale). Solleva Failed se la console non e' utilizzabile.
+    cmdline e' un comando per cmd (niente "!": si usa l'espansione ritardata per leggere il codice di uscita)."""
+    full = 'cmd /d /s /v:on /c "%s & echo %s!errorlevel! & pause>nul"' % (cmdline, MARK)
     si = STARTUPINFOW()
     si.cb = ctypes.sizeof(si)
     si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USECOUNTCHARS
     si.wShowWindow = SW_HIDE
     si.dwXCountChars, si.dwYCountChars = WIDTH, HEIGHT
     pi = PROCESS_INFORMATION()
-    buf = ctypes.create_unicode_buffer(cmdline)
-    if not k32.CreateProcessW(None, buf, None, None, False, CREATE_NEW_CONSOLE | CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT,
-                              None, None, ctypes.byref(si), ctypes.byref(pi)):
+    buf = ctypes.create_unicode_buffer(full)
+    if not k32.CreateProcessW(None, buf, None, None, False, CREATE_NEW_CONSOLE, None, None, ctypes.byref(si), ctypes.byref(pi)):
         raise Failed("CreateProcess: errore %d" % ctypes.get_last_error())
     attached = False
     hout = None
     try:
-        # ci si aggancia alla sua console PRIMA che parta: cosi' quando finisce lo schermo resta leggibile
-        if not k32.AttachConsole(pi.dwProcessId):
-            k32.TerminateProcess(pi.hProcess, 1)
-            raise Failed("AttachConsole: errore %d" % ctypes.get_last_error())
+        t0 = time.time()
+        while not k32.AttachConsole(pi.dwProcessId):  # la console nasce qualche millisecondo dopo il processo
+            err = ctypes.get_last_error()
+            if time.time() - t0 > 5 or k32.WaitForSingleObject(pi.hProcess, 0) == 0:
+                k32.TerminateProcess(pi.hProcess, 1)
+                raise Failed("AttachConsole: errore %d" % err)
+            time.sleep(0.01)
         attached = True
         hout = k32.CreateFileW("CONOUT$", 0xC0000000, 3, None, 3, 0, None)  # lettura/scrittura, condiviso, esistente
         if not hout or hout == INVALID:
-            k32.TerminateProcess(pi.hProcess, 1)
+            _kill_tree(pi.dwProcessId)
             raise Failed("CONOUT$: errore %d" % ctypes.get_last_error())
-        k32.ResumeThread(pi.hThread)
         end = time.time() + timeout
         last = None
         killed = None
+        code = None
         while True:
-            done = k32.WaitForSingleObject(pi.hProcess, int(interval * 1000)) == 0
+            dead = k32.WaitForSingleObject(pi.hProcess, int(interval * 1000)) == 0
             text = _screen(hout)
-            if text is not None and text != last:
-                last = text
-                on_text(text)
-            if done:
+            if text is not None:
+                code = _exit_code(text)
+                shown = _clean(text)
+                if shown != last:
+                    last = shown
+                    on_text(shown)
+            if code is not None or dead:
                 break
             if (stop is not None and stop.is_set()) or time.time() > end:
                 killed = "Interrotto." if stop is not None and stop.is_set() else "Tempo scaduto."
-                _kill_tree(pi.dwProcessId)
-                k32.WaitForSingleObject(pi.hProcess, 5000)
                 break
-        code = W.DWORD(0)
-        k32.GetExitCodeProcess(pi.hProcess, ctypes.byref(code))
-        text = _screen(hout)
-        if text is None:
-            text = last or ""
+        _kill_tree(pi.dwProcessId)  # chiude anche la pause (e il comando, se interrotto)
+        text = last or ""
         if killed:
-            text = (text + "\n" + killed).strip()
-        return (code.value if not killed else -1), text
+            return -1, (text + "\n" + killed).strip()
+        return (code if code is not None else -1), text
     finally:
         if hout and hout != INVALID:
             k32.CloseHandle(hout)
