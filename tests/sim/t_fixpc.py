@@ -1,0 +1,47 @@
+"""Fix PC: catalogo coerente (id unici, campi presenti, comandi non vuoti) ed esecuzione simulata dei passi."""
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+from lagdoctor import fixpc as F  # noqa: E402
+
+cat = F.catalog()
+ids = [f["id"] for c in cat["cats"] for f in c["fx"]]
+assert len(ids) == len(set(ids)) == len(F.BY_ID), "id duplicati"
+assert len(cat["cats"]) >= 10 and len(ids) >= 50
+for f in F.BY_ID.values():
+    assert f["t"] and f["q"] and f["d"] and f["steps"], f["id"]
+    for st in f["steps"]:
+        assert st["sh"] in ("cmd", "ps", "py") and st["c"].strip(), f["id"]
+        if st["sh"] == "py":
+            assert st["fn"] in ("explorer_kill", "explorer_start", "open_wlanreport", "open_battery", "launch_mdsched"), st["fn"]
+    assert not (f["ro"] and f["w"]), "un controllo in sola lettura non deve avere avvisi: %s" % f["id"]
+# i passi che riavviano i servizi devono girare anche se un passo prima fallisce
+for fid in ("wu.ripristina-windows-update", "altro.sblocca-la-coda-di-stampa", "ui.ricostruisci-la-cache-delle-icone"):
+    assert F.BY_ID[fid]["steps"][-1]["always"], fid
+
+# esecuzione: il passo 2 fallisce -> si ferma, ma il passo "always" gira lo stesso
+seq = []
+
+
+def fake_popen(step):
+    seq.append(step["c"])
+    code = 5 if step["c"] == "B" else 0
+    p = subprocess.Popen(["bash", "-c", "printf 'riga %s\\r\\n10%%%%\\r100%%%%\\r\\n'; exit %d" % (step["c"], code)],
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    return p, F._decoder("utf-8")
+
+
+F._popen = fake_popen
+F.BY_ID["t"] = {"id": "t", "t": "prova", "r": False, "ro": False, "res": None,
+                "steps": [F.cmd("A"), F.cmd("B"), F.cmd("C"), F.cmd("D", always=True)]}
+r = F.run("t")
+assert seq == ["A", "B", "D"], seq
+assert not r["ok"] and "\"B\"" in r["res"], r
+assert "100%" in r["out"] and "10%" not in r["out"].replace("100%", ""), r["out"]
+seq.clear()
+F.BY_ID["t"]["steps"] = [F.cmd("A"), F.cmd("B", soft=True), F.cmd("C")]
+r = F.run("t")
+assert seq == ["A", "B", "C"] and r["ok"], (seq, r)
+print("OK fix pc: %d fix in %d categorie" % (len(ids), len(cat["cats"])))

@@ -22,6 +22,7 @@ from . import analysis, capture, checks, factors, fixes, gamemode, gpu_driver, p
 from . import overlays
 from . import autostart
 from . import verifica
+from . import fixpc
 from . import __version__, pdh, settings, tray, updater
 from . import gpu as gpumod
 from .main import BACKUP, GAME_HINTS, NOT_GAMES, REPORTS, ROOT, TOOLS
@@ -476,6 +477,16 @@ def job_verifica(job):
     return {"rows": rows, "summary": verifica.summary(rows), "text": text, "file": name}
 
 
+def job_fixpc(job, fid):
+    """Fix PC: esegue i comandi di un fix, l'uscita va in job.live mentre girano."""
+    job.live = {"id": fid, "out": ""}
+
+    def live(text):
+        job.live = {"id": fid, "out": text}
+    r = fixpc.run(fid, job=job, live=live)
+    return r
+
+
 def job_restore_all(job):
     msgs = tweaks.revert_all()
     try:
@@ -652,6 +663,8 @@ class Handler(BaseHTTPRequestHandler):
             return job.as_dict() if job else {"status": "missing"}
         if path == "/api/catalog":
             return catalog_json()
+        if path == "/api/fixpc":
+            return fixpc.catalog()
         if path == "/api/autostart":
             return autostart.list_items(include_windows=qs.get("all", ["0"])[0] == "1")
         if path == "/api/startup":
@@ -730,13 +743,20 @@ class Handler(BaseHTTPRequestHandler):
             STATE["boot_job"] = job.id
             return 200, job.as_dict()
         if path in ("/api/scan", "/api/apply", "/api/revert", "/api/restore_all", "/api/record", "/api/check",
-                    "/api/verifica"):
+                    "/api/verifica", "/api/fixpc/run"):
             if STATE["busy"] and JOBS.get(STATE["busy"]) and JOBS[STATE["busy"]].status == "running":
                 return 409, {"error": "C'e' gia' un'operazione in corso: aspetta che finisca."}
         if path == "/api/scan":
             job = start_job("scan", job_scan)
         elif path == "/api/verifica":
             job = start_job("verifica", job_verifica)
+        elif path == "/api/fixpc/run":
+            fid = b.get("id", "")
+            if fid not in fixpc.BY_ID:
+                return 400, {"error": "Fix sconosciuto."}
+            if not _is_admin():
+                return 400, {"error": "Per i comandi di Fix PC LagDoctor deve essere avviato come amministratore."}
+            job = start_job("fixpc", job_fixpc, fid)
         elif path == "/api/check":
             job = start_job("check", lambda j: refresh_statuses(j) or catalog_json())
         elif path == "/api/apply":
@@ -845,7 +865,7 @@ class Handler(BaseHTTPRequestHandler):
             return 200, {"ok": True}
         else:
             return 404, {"error": "sconosciuto"}
-        if job.kind in ("scan", "apply", "revert", "restore_all", "record", "check"):
+        if job.kind in ("scan", "apply", "revert", "restore_all", "record", "check", "fixpc"):
             STATE["busy"] = job.id
         return 200, job.as_dict()
 

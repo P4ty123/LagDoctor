@@ -776,8 +776,101 @@ function undoDialog() {
 function soonPage(title, sub) {
   main().innerHTML = `<h1>${title}</h1><p class="sub">${sub}</p><div class="empty">In arrivo nei prossimi aggiornamenti.</div>`;
 }
-function fixpcPage() { soonPage("Fix PC", "Comandi per sistemare i problemi di Windows, con la spiegazione di cosa fa ognuno."); }
 function pulitorePage() { soonPage("Pulitore", "Pulizia dei file inutili che occupano spazio sul disco."); }
+
+/* ------------------------------------------------------------------ Fix PC */
+const FX_IC = {
+  rete: ["#00d4ff", '<path d="M2 8.5a15 15 0 0 1 20 0"/><path d="M5 12a10 10 0 0 1 14 0"/><path d="M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/>'],
+  bt: ["#4d8dff", '<path d="M7 7l10 10-5 4V3l5 4L7 17"/>'],
+  dischi: ["#a78bfa", '<rect x="3" y="13" width="18" height="7" rx="2"/><path d="M5 13l2.5-8h9l2.5 8"/><path d="M7 16.5h.01M10.5 16.5h.01"/>'],
+  sys: ["#2ee59d", '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>'],
+  wu: ["#38bdf8", '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/><path d="M12 8v6M9.5 11.5L12 14l2.5-2.5"/>'],
+  audio: ["#f472b6", '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>'],
+  ui: ["#7c5cff", '<rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>'],
+  app: ["#ffb547", '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>'],
+  dev: ["#ff8a5c", '<path d="M9 2v5M15 2v5"/><path d="M6 7h12v4a6 6 0 0 1-12 0z"/><path d="M12 17v5"/>'],
+  altro: ["#94a3b8", '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
+};
+const fxIcon = (id) => { const i = FX_IC[id] || ["#8b90a8", '<circle cx="12" cy="12" r="4"/>']; return `<span class="ci" style="color:${i[0]}"><svg viewBox="0 0 24 24">${i[1]}</svg></span>`; };
+async function fixpcPage() {
+  if (!S.fx) {
+    main().innerHTML = '<div class="loading"><div class="spinner"></div><p>Carico i comandi...</p></div>';
+    S.fx = await api("/api/fixpc");
+    S.fxRes = S.fxRes || {}; S.fxOpen = S.fxOpen || new Set();
+  }
+  S.fxCat = S.fxCat || S.fx.cats[0].id;
+  main().innerHTML = `<h1>Fix PC</h1><p class="sub">Comandi veri di Windows per sistemare i problemi piu' comuni. Scegli la categoria, leggi a cosa serve e premi Esegui: vedi il risultato qui sotto.</p>
+    <input class="fx-search" id="fx-q" type="search" placeholder="Cerca un problema (es. wifi, cuffie, schermata blu, aggiornamenti)...">
+    <div class="fx-wrap"><div class="fx-cats" id="fx-cats"></div><div id="fx-body"></div></div>`;
+  $("#fx-q").addEventListener("input", renderFix);
+  renderFix();
+}
+function renderFix() {
+  const q = ($("#fx-q")?.value || "").trim().toLowerCase();
+  const running = S.fxRunning;
+  $("#fx-cats").innerHTML = S.fx.cats.map((c) => `<a class="fx-cat ${!q && c.id === S.fxCat ? "on" : ""}" data-c="${c.id}">${fxIcon(c.id)}<span class="n">${esc(c.n)}</span><small>${c.fx.length}</small></a>`).join("");
+  $$("#fx-cats a").forEach((a) => a.addEventListener("click", () => { S.fxCat = a.dataset.c; $("#fx-q").value = ""; renderFix(); main().scrollTop = 0; }));
+  const card = (f) => {
+    const b = [f.best ? '<span class="badge b-acc">CONSIGLIATO</span>' : "", f.ro ? '<span class="badge b-ok">SOLO CONTROLLO</span>' : "",
+      f.r ? '<span class="badge b-warn">RIAVVIO</span>' : "", f.w ? '<span class="badge b-bad">ATTENZIONE</span>' : "",
+      `<span class="badge">${esc(f.d)}</span>`].join("");
+    const open = S.fxOpen.has(f.id), res = S.fxRes[f.id], me = running === f.id;
+    return `<div class="fx" data-id="${f.id}"><div class="fx-top"><div class="fx-main"><div class="fx-t">${esc(f.t)}${b}</div><p class="fx-q">${esc(f.q)}</p>
+      ${f.w ? `<p class="fx-warn">${esc(f.w)}</p>` : ""}</div>
+      <div class="fx-btns"><button class="ghost fx-cmd">${open ? "Nascondi comandi" : "Comandi"}</button>
+        ${me ? '<button class="ghost fx-stop">Interrompi</button>' : `<button class="fx-go" ${running ? "disabled" : ""}>${res ? "Esegui di nuovo" : "Esegui"}</button>`}</div></div>
+      ${open ? `<div class="fx-code">${f.c.map((x) => '<span class="fxp">&gt; </span>' + esc(x)).join("\n")}</div>` : ""}
+      ${me || res ? `<div class="fx-out">${esc(me ? (S.fxLive || "Avvio...") : res.out)}</div>` : ""}
+      ${me ? '<p class="fx-res run"><span class="spinner sm"></span>In corso...</p>' : res ? `<p class="fx-res ${res.ok ? "ok" : "bad"}">${res.ok ? "Fatto" : "Non riuscito"}: ${esc(res.res)}</p>` : ""}</div>`;
+  };
+  let html;
+  if (q) {
+    const hits = S.fx.cats.map((c) => [c, c.fx.filter((f) => (f.t + " " + f.q + " " + f.kw + " " + c.n).toLowerCase().includes(q))]).filter(([, l]) => l.length);
+    html = hits.length ? hits.map(([c, l]) => `<div class="fx-head">${fxIcon(c.id)}<h2>${esc(c.n)}</h2></div><div class="fx-list">${l.map(card).join("")}</div>`).join("")
+      : '<div class="empty">Nessun fix trovato: prova con un\'altra parola.</div>';
+  } else {
+    const c = S.fx.cats.find((x) => x.id === S.fxCat) || S.fx.cats[0];
+    html = `<div class="fx-head">${fxIcon(c.id)}<h2>${esc(c.n)}</h2></div><div class="fx-list">${c.fx.map(card).join("")}</div>`;
+  }
+  $("#fx-body").innerHTML = html;
+  $$("#fx-body .fx").forEach((el) => {
+    const id = el.dataset.id;
+    $(".fx-cmd", el).onclick = () => { S.fxOpen.has(id) ? S.fxOpen.delete(id) : S.fxOpen.add(id); renderFix(); };
+    const go = $(".fx-go", el); if (go) go.onclick = () => fixAsk(id);
+    const st = $(".fx-stop", el); if (st) st.onclick = () => S.fxJob && api("/api/stop", { id: S.fxJob }).catch(() => {});
+  });
+  const o = $("#fx-body .fx-out"); if (o && running) o.scrollTop = o.scrollHeight;
+}
+function fxFind(id) { for (const c of S.fx.cats) for (const f of c.fx) if (f.id === id) return f; }
+function fixAsk(id) {
+  const f = fxFind(id);
+  if (!f.w && !f.r) return fixRun(id);
+  const m = modal(`<h2>${esc(f.t)}</h2>${f.w ? `<p>${esc(f.w)}</p>` : ""}${f.r ? "<p>Alla fine servira' un riavvio del PC per completare.</p>" : ""}
+    <div class="fx-code" style="margin:0 0 16px">${f.c.map((x) => '<span class="fxp">&gt; </span>' + esc(x)).join("\n")}</div>
+    <div class="row" style="justify-content:flex-end"><button class="ghost" id="m-cancel">Annulla</button><button id="m-ok">Esegui</button></div>`);
+  $("#m-cancel", m).onclick = closeModal;
+  $("#m-ok", m).onclick = () => { closeModal(); fixRun(id); };
+}
+async function fixRun(id) {
+  if (S.fxRunning) return;
+  S.fxRunning = id; S.fxLive = ""; delete S.fxRes[id];
+  const here = () => S.page === "fixpc" && $("#fx-body");
+  if (here()) renderFix();
+  try {
+    const job = await runJob(api("/api/fixpc/run", { id }).then((j) => { S.fxJob = j.id; return j; }), (j) => {
+      S.fxLive = (j.live && j.live.out) || "";
+      const o = here() && $(`#fx-body .fx[data-id="${CSS.escape(id)}"] .fx-out`);
+      if (o) { const end = o.scrollTop + o.clientHeight >= o.scrollHeight - 30; o.textContent = S.fxLive || "Avvio..."; if (end) o.scrollTop = o.scrollHeight; }
+    });
+    S.fxRes[id] = job.result;
+  } catch (e) {
+    S.fxRes[id] = { ok: false, out: S.fxLive || "", res: e.message };
+  }
+  S.fxRunning = null; S.fxJob = null;
+  const r = S.fxRes[id];
+  toast((r.ok ? "Fatto: " : "Non riuscito: ") + fxFind(id).t);
+  if (here()) renderFix();
+}
 
 async function driver() {
   main().innerHTML = '<div class="loading"><div class="spinner"></div><p>Leggo le impostazioni del driver video...</p></div>';

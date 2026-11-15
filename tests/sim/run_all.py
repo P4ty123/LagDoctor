@@ -27,6 +27,7 @@ PROVE = [
     ("t_autostart2.py", "processi in background all'avvio"),
     ("t_cputopo.py", "processori: affinita' dei core"),
     ("t_eco.py", "processori: modalita' efficienza"),
+    ("t_fixpc.py", "Fix PC: catalogo dei comandi ed esecuzione"),
 ]
 
 

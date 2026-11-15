@@ -1,3 +1,12 @@
+## LagDoctor 5.25.17
+
+- Nuova scheda Fix PC: 53 comandi veri di Windows per sistemare i problemi piu' comuni, divisi in 10 categorie
+  (rete, Bluetooth, dischi, file di Windows con DISM e SFC, Windows Update, audio, desktop e menu Start, Store e
+  app, dispositivi e driver, avvio/ora/stampanti). Ogni fix spiega quando serve, mostra i comandi esatti e il loro
+  risultato mentre girano. Quelli delicati chiedono conferma; c'e' la ricerca per problema (es. "cuffie", "wifi").
+- Il collaudo su Windows vero prima di ogni versione esegue anche i fix sicuri e controlla la sintassi di tutti i
+  comandi PowerShell di Fix PC.
+
 ## LagDoctor 5.25.16
 
 - Menu a sinistra con scritte e icone piu' grandi; nuova icona (processore) per Ottimizzazioni.

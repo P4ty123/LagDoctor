@@ -133,6 +133,11 @@ def sintassi_powershell():
             if isinstance(v, str) and v.strip():
                 pezzi.append(("%s.%s" % (t.id, attr), v))
     pezzi.append(("autostart.PS_TASKS", autostart.PS_TASKS))
+    from lagdoctor import fixpc
+    for f in fixpc.BY_ID.values():
+        for i, st in enumerate(f["steps"]):
+            if st["sh"] == "ps":
+                pezzi.append(("fixpc.%s.%d" % (f["id"], i), st["c"]))
     script = os.path.join(OUT, "sintassi.ps1")
     files = []
     for i, (nome, codice) in enumerate(pezzi):
@@ -288,12 +293,29 @@ def f_verifica():
     return True, "%d righe" % len(rows)
 
 
+def fixpc_veri():
+    """Fix PC: esegue davvero i fix sicuri (non tolgono Internet e non riavviano) e controlla che riescano."""
+    from lagdoctor import fixpc
+    for f in fixpc.BY_ID.values():
+        if not f["ci"]:
+            continue
+        try:
+            r = fixpc.run(f["id"])
+            ultima = (r["out"].strip().splitlines() or [""])[-1][:150]
+            esito("Fix PC", f["t"], r["ok"], "%s s, %s" % (r["secs"], r["res"] if not r["ok"] else ultima))
+            if not r["ok"]:
+                print(r["out"][-1500:], file=sys.stderr)
+        except Exception as e:
+            esito("Fix PC", f["t"], False, "%s: %s" % (type(e).__name__, str(e)[:200]))
+
+
 def main():
     t0 = time.time()
     print("Collaudo su Windows vero - LagDoctor", file=sys.stderr)
     for t in sorted(T.for_vendor(None), key=lambda x: (T.CAT_ORDER.index(x.cat) if x.cat in T.CAT_ORDER else 99, x.id)):
         collauda_voce(t)
     sintassi_powershell()
+    fixpc_veri()
     for f in (f_autostart_lettura, f_autostart_servizio, f_autostart_attivita, f_manutenzione, f_autorestart, f_timer,
               f_cpu, f_verifica):
         f()
