@@ -1,3 +1,14 @@
+## LagDoctor 5.25.19
+
+- Fix PC: l'uscita dei comandi ora si vede esattamente come nel Prompt dei comandi, aggiornata in tempo reale.
+  Prima Windows la consegnava a blocchi (la percentuale di SFC saltava dal 38% al 74%) e SFC non mostrava il
+  messaggio finale; anche le lettere accentate ora si vedono giuste.
+- Fix PC: alla fine compare l'esito in parole semplici. SFC: nessun file danneggiato / file riparati / file che non
+  si riescono a riparare (con cosa fare); DISM: nessun danneggiamento / danni riparabili / errori comuni spiegati
+  (es. 0x800f081f); controllo del disco: nessun errore / errori trovati. L'esito di SFC viene letto anche dal suo
+  registro (CBS.log) se il messaggio non si riesce a leggere.
+- Fix PC: gli errori di PowerShell si vedono in una riga sola ("ERRORE: ...") invece del blocco rosso illeggibile.
+
 ## LagDoctor 5.25.18
 
 - Ottimizzazioni: ogni categoria ha la sua icona colorata (la scheda video e' verde con NVIDIA, rossa con AMD).
