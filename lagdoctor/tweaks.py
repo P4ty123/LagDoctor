@@ -348,14 +348,17 @@ class CmdTweak(Tweak):
         return None
 
     def apply(self):
+        before = self.status()
         code, out = ps(self.on, timeout=120)
         if self.status() is False and not self.reboot:  # con il riavvio lo stato cambia solo dopo: lo dice la verifica
             raise RuntimeError(self.after_check or ("Windows non ha applicato la modifica" +
                                                     (": " + out[-300:] if out.strip() else
                                                      " (nessun messaggio: il dispositivo potrebbe non supportarla)")))
-        return {}
+        return {"was_active": before}  # gia' attiva prima: Annulla non deve cambiarla
 
     def revert(self, backup):
+        if (backup or {}).get("was_active") is True:
+            return  # era gia' cosi' prima di LagDoctor: annullare non deve portarla nello stato opposto
         ps(self.off, timeout=120)
 
 
@@ -377,14 +380,36 @@ class BcdTweak(Tweak):
                 return v == want
         return False
 
+    def _raw(self):
+        """Valore attuale dell'opzione (None = non impostata), in forma riscrivibile con bcdedit /set."""
+        code, out = run(["bcdedit", "/enum", "{current}"])
+        if code != 0:
+            return "?"
+        for line in out.splitlines():
+            parts = line.split()
+            if parts and parts[0].lower() == self.option:
+                v = parts[-1]
+                low = v.lower()
+                if low in ("yes", "true") or low.startswith("s"):  # "Si'" in italiano
+                    return "yes"
+                if low in ("no", "false"):
+                    return "no"
+                return v
+        return None
+
     def apply(self):
+        prev = self._raw()
         code, out = run(["bcdedit", "/set", "{current}", self.option, self.value])
         if code != 0:
             raise RuntimeError(out)
-        return {}
+        return {"prev": prev}
 
     def revert(self, backup):
-        run(["bcdedit", "/deletevalue", "{current}", self.option])
+        prev = (backup or {}).get("prev", None) if "prev" in (backup or {}) else None
+        if prev and prev != "?":  # c'era un valore: lo rimetto com'era
+            run(["bcdedit", "/set", "{current}", self.option, prev])
+        else:
+            run(["bcdedit", "/deletevalue", "{current}", self.option])
 
 
 class DxUserSettingTweak(Tweak):
