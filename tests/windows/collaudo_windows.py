@@ -294,19 +294,47 @@ def f_verifica():
 
 
 def fixpc_veri():
-    """Fix PC: esegue davvero i fix sicuri (non tolgono Internet e non riavviano) e controlla che riescano."""
-    from lagdoctor import fixpc
+    """Fix PC: esegue davvero i fix sicuri (non tolgono Internet e non riavviano) e controlla che riescano.
+    Come nell'exe di LagDoctor (che non ha console), l'uscita dei comandi viene letta dallo schermo di una console
+    nascosta: si controlla che succeda davvero e che la percentuale di SFC arrivi fluida."""
+    import ctypes
+    import re
+    from lagdoctor import conrun, fixpc
+    ctypes.WinDLL("kernel32").FreeConsole()  # l'exe di LagDoctor non ha console: qui la si toglie per fare lo stesso
+    esito("Fix PC", "lettura dalla console nascosta disponibile", conrun.available())
     for f in fixpc.BY_ID.values():
         if not f["ci"]:
             continue
         try:
             r = fixpc.run(f["id"])
-            ultima = (r["out"].strip().splitlines() or [""])[-1][:150]
-            esito("Fix PC", f["t"], r["ok"], "%s s, %s" % (r["secs"], r["res"] if not r["ok"] else ultima))
-            if not r["ok"]:
+            ultima = (r["out"].strip().splitlines() or [""])[-1][:120]
+            shell = [m for m, st in zip(r["modes"], [x for x in f["steps"] if x["sh"] != "py"])]
+            ok = r["ok"] and all(m == "console" for m in shell)
+            esito("Fix PC", f["t"], ok, "%s s, %s | %s | %s" % (r["secs"], ",".join(r["modes"]), r["res"], ultima))
+            if not ok:
                 print(r["out"][-1500:], file=sys.stderr)
         except Exception as e:
             esito("Fix PC", f["t"], False, "%s: %s" % (type(e).__name__, str(e)[:200]))
+            traceback.print_exc()
+    # SFC vero (solo verifica, non ripara niente): percentuale fluida ed esito letto correttamente
+    fixpc.BY_ID["_sfc"] = {"id": "_sfc", "t": "SFC verifica", "r": False, "ro": True, "res": "sfc",
+                           "steps": [fixpc.cmd("sfc /verifyonly", soft=True)]}
+    viste = []
+
+    def live(text):
+        m = re.findall(r"(\d{1,3})\s*%", text)
+        if m and (not viste or viste[-1] != int(m[-1])):
+            viste.append(int(m[-1]))
+    try:
+        r = fixpc.run("_sfc", live=live)
+        ok = r["ok"] and len(set(viste)) >= 15 and "a posto" in r["res"]
+        esito("Fix PC", "SFC: percentuale fluida ed esito chiaro", ok,
+              "%s s, %d percentuali diverse (%s), esito: %s" % (r["secs"], len(set(viste)), viste[:6] + ["..."] + viste[-3:], r["res"]))
+        if not ok:
+            print(r["out"][-2000:], file=sys.stderr)
+    except Exception as e:
+        esito("Fix PC", "SFC: percentuale fluida ed esito chiaro", False, "%s: %s" % (type(e).__name__, str(e)[:200]))
+        traceback.print_exc()
 
 
 def main():
@@ -315,10 +343,10 @@ def main():
     for t in sorted(T.for_vendor(None), key=lambda x: (T.CAT_ORDER.index(x.cat) if x.cat in T.CAT_ORDER else 99, x.id)):
         collauda_voce(t)
     sintassi_powershell()
-    fixpc_veri()
     for f in (f_autostart_lettura, f_autostart_servizio, f_autostart_attivita, f_manutenzione, f_autorestart, f_timer,
               f_cpu, f_verifica):
         f()
+    fixpc_veri()  # per ultimo: toglie la console a questo processo, come nell'exe di LagDoctor
     rimaste = T.applied_by_us()
     if rimaste:  # nessuna voce deve restare applicata alla fine
         esito("Pulizia", "voci rimaste applicate", False, ", ".join(rimaste))

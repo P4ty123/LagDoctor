@@ -49,7 +49,7 @@ const fmt = (v, d = 0) => (v === null || v === undefined || isNaN(v)) ? "–" : 
 async function runJob(start, onUpdate) {
   let job = await start;
   while (job.status === "running") {
-    await new Promise((r) => setTimeout(r, job.kind === "record" ? 800 : 600));
+    await new Promise((r) => setTimeout(r, job.kind === "record" ? 800 : job.kind === "fixpc" ? 350 : 600));
     job = await api("/api/job?id=" + job.id);
     onUpdate && onUpdate(job);
   }
@@ -837,7 +837,7 @@ function renderFix() {
         ${me ? '<button class="ghost fx-stop">Interrompi</button>' : `<button class="fx-go" ${running ? "disabled" : ""}>${res ? "Esegui di nuovo" : "Esegui"}</button>`}</div></div>
       ${open ? `<div class="fx-code">${f.c.map((x) => '<span class="fxp">&gt; </span>' + esc(x)).join("\n")}</div>` : ""}
       ${me || res ? `<div class="fx-out">${esc(me ? (S.fxLive || "Avvio...") : res.out)}</div>` : ""}
-      ${me ? '<p class="fx-res run"><span class="spinner sm"></span>In corso...</p>' : res ? `<p class="fx-res ${res.ok ? "ok" : "bad"}">${res.ok ? "Fatto" : "Non riuscito"}: ${esc(res.res)}</p>` : ""}</div>`;
+      ${me ? '<p class="fx-res run"><span class="spinner sm"></span>In corso...</p>' : res ? `<p class="fx-res ${res.ok ? "ok" : "bad"}"><b>${res.ok ? "&#10004;" : "&#10006;"}</b>${esc(res.res)}</p>` : ""}</div>`;
   };
   let html;
   if (q) {
@@ -880,11 +880,11 @@ async function fixRun(id) {
     });
     S.fxRes[id] = job.result;
   } catch (e) {
-    S.fxRes[id] = { ok: false, out: S.fxLive || "", res: e.message };
+    S.fxRes[id] = { ok: false, out: S.fxLive || "", res: "Errore: " + e.message };
   }
   S.fxRunning = null; S.fxJob = null;
   const r = S.fxRes[id];
-  toast((r.ok ? "Fatto: " : "Non riuscito: ") + fxFind(id).t);
+  toast((r.ok ? "Finito: " : "Attenzione: ") + fxFind(id).t);
   if (here()) renderFix();
 }
 

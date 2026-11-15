@@ -13,7 +13,7 @@ import subprocess
 import threading
 import time
 
-from . import paths
+from . import conrun, paths
 
 CREATE_NO_WINDOW = 0x08000000
 USB_SUSPEND = "2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226"
@@ -101,9 +101,9 @@ CATS = [
     ]),
     ("dischi", "Dischi", [
         fix("Controllo veloce del disco", "Errori di lettura, file che non si aprono: controlla il disco C senza riavviare.",
-            [cmd("chkdsk C: /scan")], ro=True, d="1-5 minuti", kw="disco errori chkdsk"),
+            [cmd("chkdsk C: /scan", soft=True)], ro=True, res="chk_scan", d="1-5 minuti", kw="disco errori chkdsk"),
         fix("Ripara il disco al riavvio", "Il controllo veloce ha trovato errori: li ripara al prossimo avvio.",
-            [cmd("echo Y | chkdsk C: /f /r", soft=True)], r=True, d="10-60 minuti",
+            [cmd("echo Y | chkdsk C: /f /r", soft=True)], r=True, res="chk_fr", d="10-60 minuti",
             w="Al riavvio il controllo puo' durare da 10 minuti a un'ora: non spegnere il PC.", kw="disco errori chkdsk"),
         fix("Ripara gli errori del volume", "Ripara subito gli errori trovati dal controllo veloce, senza il controllo lungo.",
             [ps("Repair-Volume -DriveLetter C -SpotFix")], d="1 minuto", kw="disco errori"),
@@ -120,16 +120,16 @@ CATS = [
     ]),
     ("sys", "File di Windows", [
         fix("Riparazione completa di Windows", "Schermate blu, errori strani, programmi di sistema che non si aprono. Fa tutto in ordine: DISM e poi SFC.",
-            [cmd("DISM /Online /Cleanup-Image /RestoreHealth"), cmd("sfc /scannow", enc="utf-16-le")], d="15-30 minuti",
+            [cmd("DISM /Online /Cleanup-Image /RestoreHealth"), cmd("sfc /scannow", enc="utf-16-le", soft=True)], d="15-30 minuti", res="full",
             best=True, kw="schermata blu errori dism sfc riparare corrotto"),
         fix("Controllo rapido dell'immagine (DISM)", "Verifica se Windows risulta gia' segnato come danneggiato.",
-            [cmd("DISM /Online /Cleanup-Image /CheckHealth")], ro=True, ci=True, kw="dism corrotto"),
+            [cmd("DISM /Online /Cleanup-Image /CheckHealth", soft=True)], ro=True, ci=True, res="dism_check", kw="dism corrotto"),
         fix("Controllo approfondito dell'immagine (DISM)", "Cerca danni nei file di Windows senza riparare.",
-            [cmd("DISM /Online /Cleanup-Image /ScanHealth")], ro=True, d="5-10 minuti", kw="dism corrotto"),
+            [cmd("DISM /Online /Cleanup-Image /ScanHealth", soft=True)], ro=True, res="dism_check", d="5-10 minuti", kw="dism corrotto"),
         fix("Ripara l'immagine di Windows (DISM)", "Scarica da Windows Update i file di sistema danneggiati e li sostituisce.",
-            [cmd("DISM /Online /Cleanup-Image /RestoreHealth")], d="10-20 minuti", kw="dism riparare"),
+            [cmd("DISM /Online /Cleanup-Image /RestoreHealth", soft=True)], d="10-20 minuti", res="dism_restore", kw="dism riparare"),
         fix("Controllo file di sistema (SFC)", "Ripara i file di sistema usando la copia locale.",
-            [cmd("sfc /scannow", enc="utf-16-le")], d="5-15 minuti", kw="sfc riparare"),
+            [cmd("sfc /scannow", enc="utf-16-le", soft=True)], d="5-15 minuti", res="sfc", kw="sfc riparare"),
     ]),
     ("wu", "Windows Update", [
         fix("Ripristina Windows Update", "Aggiornamenti bloccati, errori 0x800..., download fermo allo 0%.",
@@ -275,6 +275,7 @@ class Output:
     def __init__(self):
         self.lines = [""]
         self.pending_cr = False
+        self.modes = []  # per ogni comando: letto dalla console o dalla pipe
 
     def feed(self, text):
         for ch in text.replace("\x00", ""):
@@ -290,6 +291,11 @@ class Output:
                 self.lines[-1] += ch
         if len(self.lines) > 1500:
             self.lines = self.lines[-1000:]
+
+    def set_live(self, start, text):
+        """sostituisce tutto da start in poi con lo schermo attuale della console."""
+        self.lines = self.lines[:start] + text.split("\n") + [""]
+        self.pending_cr = False
 
     def line(self, s):
         if self.lines[-1]:
@@ -311,17 +317,27 @@ class Output:
         return "\n".join(out).strip("\n")
 
 
-def _popen(step):
+def _ps_script(c, width):
+    return ("$ProgressPreference='SilentlyContinue'; $ErrorActionPreference='Continue'; $global:LASTEXITCODE=0; $n=0; "
+            "& { " + c + " } *>&1 | ForEach-Object { if ($_ -is [System.Management.Automation.ErrorRecord]) { $n++; "
+            "'ERRORE: ' + $_.Exception.Message } else { $_ } } | Out-String -Width %d -Stream; "
+            "if ($n) { exit 1 } elseif ($LASTEXITCODE) { exit $LASTEXITCODE }" % width)
+
+
+def _cmdline(step, width):
     c = _expand(step["c"])
     if step["sh"] == "ps":
-        script = ("$ProgressPreference='SilentlyContinue'; [Console]::OutputEncoding=[Text.Encoding]::UTF8; "
-                  "$ErrorActionPreference='Continue'; $global:LASTEXITCODE=0; $n=0; & { " + c + " } *>&1 | ForEach-Object { "
-                  "if ($_ -is [System.Management.Automation.ErrorRecord]) { $n++ }; $_ } | Out-String -Width 160 -Stream; "
-                  "if ($n) { exit 1 } elseif ($LASTEXITCODE) { exit $LASTEXITCODE }")
+        script = _ps_script(c, width)
+        if width != conrun.WIDTH - 5:  # pipe: l'uscita di PowerShell arriva in UTF-8
+            script = "[Console]::OutputEncoding=[Text.Encoding]::UTF8; " + script
         enc = base64.b64encode(script.encode("utf-16-le")).decode()
-        args, dec = ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", enc], _decoder("utf-8")
-    else:
-        args, dec = "cmd /d /c " + c, _decoder(step.get("enc"))
+        return "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + enc
+    return "cmd /d /c " + c
+
+
+def _popen(step):
+    args = _cmdline(step, 160)
+    dec = _decoder("utf-8") if step["sh"] == "ps" else _decoder(step.get("enc"))
     p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                          creationflags=CREATE_NO_WINDOW if os.name == "nt" else 0)
     return p, dec
@@ -360,22 +376,111 @@ def _action(name):
     raise ValueError("azione sconosciuta: %s" % name)
 
 
-def _summary(f, ok, failed, out):
+def _has(text, *frags):
+    t = text.lower()
+    return any(x in t for x in frags)
+
+
+def _code(c):
+    return "0x%08X" % (c & 0xFFFFFFFF) if isinstance(c, int) and (c < 0 or c > 0xFFFF) else str(c)
+
+
+DISM_ERR = {0x800F081F: "DISM non trova i file per riparare: controlla la connessione a Internet e che Windows Update funzioni.",
+            0x800F0906: "DISM non riesce a scaricare i file per riparare: controlla la connessione a Internet.",
+            0x800F0907: "DISM non riesce a scaricare i file per riparare: un criterio di gruppo lo impedisce.",
+            0x800F0954: "DISM non riesce a usare Windows Update (WSUS o criteri aziendali).",
+            0x800F0950: "DISM non trova i file per riparare.",
+            740: "serve LagDoctor avviato come amministratore.",
+            5: "accesso negato: serve LagDoctor avviato come amministratore."}
+
+
+def _sfc(out):
+    if _has(out, "non ha rilevato violazioni", "did not find any integrity violations"):
+        return True, "SFC non ha trovato nessun file danneggiato: i file di sistema di Windows sono a posto."
+    if _has(out, "li ha ripristinati", "successfully repaired"):
+        return True, "SFC ha trovato file danneggiati e li ha riparati tutti. Riavvia il PC per completare."
+    if _has(out, "correggerne alcuni", "unable to fix some"):
+        return False, ("SFC ha trovato file danneggiati ma non e' riuscito a ripararli tutti: esegui \"Ripara l'immagine "
+                       "di Windows (DISM)\", riavvia e poi esegui di nuovo SFC.")
+    if _has(out, "riparazione del sistema in sospeso", "repair pending"):
+        return False, "C'e' una riparazione di Windows in sospeso: riavvia il PC e poi esegui di nuovo SFC."
+    if _has(out, "eseguire l'operazione richiesta", "could not perform the requested operation"):
+        return False, "SFC non e' riuscito a fare il controllo: riavvia il PC e riprova (se succede ancora, prova in modalita' provvisoria)."
+    return None, "SFC ha finito: leggi il suo messaggio qui sopra."
+
+
+def _dism(out, code, restore):
+    if code not in (0, 3010):
+        msg = DISM_ERR.get(code & 0xFFFFFFFF if isinstance(code, int) else code)
+        return False, "DISM non e' riuscito (errore %s)%s" % (_code(code), ": " + msg if msg else ": leggi il messaggio qui sopra.")
+    if restore:
+        return True, "DISM ha completato la riparazione: l'immagine di Windows e' a posto."
+    if _has(out, "not repairable", "non e' ripristinabile", "non è ripristinabile", "non riparabile"):
+        return False, "DISM dice che l'immagine di Windows e' danneggiata e NON si puo' riparare: serve reinstallare Windows mantenendo i file."
+    if _has(out, "repairable", "ripristinabile", "riparabile"):
+        return False, "DISM ha trovato file di Windows danneggiati che si possono riparare: esegui \"Ripara l'immagine di Windows (DISM)\"."
+    return True, "DISM non ha trovato nessun danneggiamento: l'immagine di Windows e' a posto."
+
+
+def _summary(f, ok, failed, out, codes=()):
+    """frase finale mostrata sotto il fix. Ritorna (ok, testo): alcuni comandi finiscono senza errori ma trovano problemi."""
+    kind = f.get("res")
+    last = codes[-1] if codes else None
+    if kind == "sfc":
+        good, msg = _sfc(out)
+        return (ok if good is None else good), msg
+    if kind == "full":
+        if len(codes) < 2:  # DISM fallito: SFC non e' partito
+            return False, _dism(out, codes[0] if codes else -1, True)[1] + " SFC non e' stato eseguito."
+        good, msg = _sfc(out)
+        return (ok if good is None else good), "DISM ha completato la riparazione. " + msg
+    if kind in ("dism_check", "dism_restore"):
+        return _dism(out, last if last is not None else -1, kind == "dism_restore")
+    if kind == "chk_scan":
+        if last == 0 or _has(out, "found no problems", "non ha rilevato problemi"):
+            return True, "Il disco C non ha errori."
+        return False, ("Il controllo ha trovato errori sul disco C: esegui \"Ripara gli errori del volume\" "
+                       "o \"Ripara il disco al riavvio\".")
+    if kind == "chk_fr":
+        if _has(out, "next time", "successivo riavvio", "prossimo riavvio"):
+            return True, "Riparazione programmata: al prossimo riavvio Windows controlla e ripara il disco (puo' durare fino a un'ora)."
+        return False, "Non sono riuscito a programmare la riparazione del disco: leggi il messaggio qui sopra."
     if not ok:
-        return "Il comando \"%s\" non e' riuscito (codice %s): leggi il messaggio qui sopra." % failed
-    if f.get("res") == "ip":
+        c = failed[1]
+        hint = DISM_ERR.get(c) if c in (5, 740) else None
+        return False, "Il comando \"%s\" non e' riuscito (codice %s): %s" % (failed[0], _code(c), hint or "leggi il messaggio qui sopra.")
+    if kind == "ip":
         ips = [ip for ip in re.findall(r"IPv4[^:\n]*:\s*([\d.]+)", out) if not ip.startswith("169.254.")]
         if ips:
-            return "nuovo indirizzo %s ricevuto dal router." % ips[-1]
-        return "comando eseguito, ma il router non ha dato un indirizzo valido: controlla cavo o Wi-Fi."
+            return True, "Nuovo indirizzo %s ricevuto dal router." % ips[-1]
+        return False, "Il router non ha dato un indirizzo valido: controlla cavo o Wi-Fi."
     if f["ro"]:
-        return "controllo completato, il risultato e' qui sopra."
+        return True, "Controllo completato, il risultato e' qui sopra."
     if f["r"]:
-        return "comando eseguito. Riavvia il PC per completare."
-    return "comando eseguito."
+        return True, "Fatto. Riavvia il PC per completare."
+    return True, "Fatto."
 
 
 def _run_step(step, out, push, stop):
+    if conrun.available():
+        start = len(out.lines) - 1 if out.lines[-1] == "" else len(out.lines)
+
+        def screen(text):
+            out.set_live(start, text)
+            push()
+        try:
+            out.modes.append("console")
+            code, text = conrun.run(_cmdline(step, conrun.WIDTH - 5), screen, stop=stop, timeout=step.get("timeout", 1800))
+            out.set_live(start, text)
+            return code
+        except conrun.Failed:
+            out.modes[-1] = "pipe"  # console non utilizzabile: uso la pipe
+            return _run_pipe(step, out, push, stop)
+    out.modes.append("pipe")
+    return _run_pipe(step, out, push, stop)
+
+
+def _run_pipe(step, out, push, stop):
     try:
         p, dec = _popen(step)
     except OSError as e:
@@ -437,6 +542,7 @@ def run(fid, job=None, live=None):
     out = Output()
     stop = job.stop if job is not None else None
     failed = None
+    codes = []
     t0 = time.time()
 
     def push():
@@ -456,11 +562,13 @@ def run(fid, job=None, live=None):
         else:
             code = _run_step(step, out, push, stop)
         push()
+        codes.append(code)
         if code not in (0, 3010) and not step.get("soft") and failed is None:
             failed = (step["c"], code)
         if stop is not None and stop.is_set() and failed is None:
             failed = (step["c"], "interrotto")
     text = out.text(1000)
     ok = failed is None
-    return {"id": fid, "ok": ok, "out": text, "res": _summary(f, ok, failed, text), "reboot": bool(f["r"] and ok),
+    ok, res = _summary(f, ok, failed, text, codes)
+    return {"id": fid, "ok": ok, "out": text, "res": res, "reboot": bool(f["r"] and ok), "modes": out.modes,
             "secs": round(time.time() - t0, 1)}
