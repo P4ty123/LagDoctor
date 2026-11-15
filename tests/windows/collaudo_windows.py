@@ -293,6 +293,54 @@ def f_verifica():
     return True, "%d righe" % len(rows)
 
 
+@prova("Icone dei giochi: estratte dal file .exe (PNG con trasparenza)")
+def f_icone():
+    import struct
+    from lagdoctor import gameicons
+    win = os.environ.get("WINDIR", r"C:\Windows")
+    prove = [("t-notepad", os.path.join(win, "System32", "notepad.exe")), ("t-explorer", os.path.join(win, "explorer.exe"))]
+    for gid, _e in prove:
+        try:
+            os.remove(gameicons.path_for(gid))
+        except OSError:
+            pass
+    ok = gameicons.extract(prove, timeout=180)
+    assert set(ok) == {g for g, _e in prove}, "icone non estratte: %s" % sorted({g for g, _e in prove} - set(ok))
+    info = []
+    for gid, _e in prove:
+        data = open(gameicons.path_for(gid), "rb").read()
+        assert data[:8] == b"\x89PNG\r\n\x1a\n", "non e' un PNG"
+        w, h, depth, ctype = struct.unpack(">IIBB", data[16:26])
+        assert w >= 32 and h >= 32 and ctype == 6, "PNG %dx%d tipo %d (serve RGBA)" % (w, h, ctype)
+        info.append("%s %dx%d" % (gid, w, h))
+    # eseguibile principale di una cartella: deve scegliere quello "vero", non uninstall/crash
+    d = os.path.join(OUT, "giocofinto")
+    os.makedirs(os.path.join(d, "bin"), exist_ok=True)
+    for name, size in (("unins000.exe", 5), ("CrashReporter.exe", 9), ("bin/GiocoFinto-Win64-Shipping.exe", 3), ("Launcher.exe", 8)):
+        with open(os.path.join(d, name), "wb") as f:
+            f.write(b"\0" * size * 2**20)
+    exe = gameicons.find_exe({"id": "x", "name": "Gioco Finto", "dir": d})
+    assert exe and exe.endswith("GiocoFinto-Win64-Shipping.exe"), "scelto %s" % exe
+    return True, ", ".join(info) + ", eseguibile del gioco scelto bene"
+
+
+@prova("Riconoscimento dei giochi aperti (Analizza gioco)")
+def f_giochi_aperti():
+    import subprocess as sp
+    from lagdoctor import gamedetect
+    fs = gamedetect.fullscreen_pids()
+    p = sp.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    try:
+        r = gamedetect.candidates()
+        assert set(r) >= {"items", "others", "icons_pending"}
+        nomi = [i["name"].lower() for i in r["items"]]
+        assert not any(n in gamedetect.NON_GAME_APPS for n in nomi), "programmi non giochi tra i giochi: %s" % nomi
+        assert all(i.get("kind") in ("lib", "folder", "fullscreen") for i in r["items"])
+    finally:
+        p.kill()
+    return True, "%d giochi, %d altri programmi, %d finestre a schermo intero" % (len(r["items"]), len(r["others"]), len(fs))
+
+
 def fixpc_veri():
     """Fix PC: esegue davvero i fix sicuri (non tolgono Internet e non riavviano) e controlla che riescano.
     Come nell'exe di LagDoctor (che non ha console), l'uscita dei comandi viene letta dallo schermo di una console
@@ -354,7 +402,7 @@ def main():
         collauda_voce(t)
     sintassi_powershell()
     for f in (f_autostart_lettura, f_autostart_servizio, f_autostart_attivita, f_manutenzione, f_autorestart, f_timer,
-              f_cpu, f_verifica):
+              f_cpu, f_verifica, f_icone, f_giochi_aperti):
         f()
     fixpc_veri()  # per ultimo: toglie la console a questo processo, come nell'exe di LagDoctor
     rimaste = T.applied_by_us()

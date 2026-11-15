@@ -23,6 +23,7 @@ from . import overlays
 from . import autostart
 from . import verifica
 from . import fixpc
+from . import gamedetect, gameicons
 from . import __version__, pdh, settings, tray, updater
 from . import gpu as gpumod
 from .main import BACKUP, GAME_HINTS, NOT_GAMES, REPORTS, ROOT, TOOLS
@@ -260,6 +261,8 @@ def gamemode_json(scan=False):
     if scan or not c["games"]:
         added = gamemode.refresh_games(c)
         gamemode.save_config(c)
+        if scan:
+            gameicons.forget_failed()  # "Cerca di nuovo": si riprova anche con le icone non trovate
     try:
         cpu = gamemode.cputopo.decide()
     except Exception:
@@ -272,7 +275,13 @@ def gamemode_json(scan=False):
         gpus = gamemode.gpu_names()
     except Exception:
         gpus = []
+    try:
+        pending = gameicons.ensure(c["games"])
+    except Exception:
+        pending = False
+    icons = [g["id"] for g in c["games"] if gameicons.have(g["id"])]
     return {"config": c, "status": gamemode.status(), "added": added, "cpu": cpu, "eco": eco, "gpus": gpus,
+            "icons": icons, "icons_pending": pending,
             "options": [{"id": k, "default": d, "name": n, "what": w, "risk": r} for k, d, n, w, r in gamemode.OPTIONS],
             "priorities": [{"id": k, "name": v[0]} for k, v in gamemode.PRIORITY.items()]}
 
@@ -320,19 +329,8 @@ def gamemode_post(b):
 
 
 def game_candidates():
-    cands = []
-    for p in psutil.process_iter(["pid", "name", "exe", "memory_info"]):
-        name = (p.info["name"] or "").lower()
-        if not name or name in NOT_GAMES or name in capture.IGNORE_PROCS:
-            continue
-        mem = p.info["memory_info"].rss / 2**20 if p.info["memory_info"] else 0
-        exe = (p.info["exe"] or "").lower()
-        likely = any(h in exe for h in GAME_HINTS)
-        if mem > 300 or (likely and mem > 100):
-            cands.append({"pid": p.info["pid"], "name": p.info["name"], "mem": round(mem), "likely": likely,
-                          "exe": p.info["exe"]})
-    cands.sort(key=lambda c: (not c["likely"], -c["mem"]))
-    return cands[:15]
+    """giochi aperti (e, a parte, gli altri programmi grandi): vedi gamedetect."""
+    return gamedetect.candidates()
 
 
 # ======================================================================= lavori
@@ -596,6 +594,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._static(u.path[4:])
             if not self._authorized(qs):
                 return self._send(403, {"error": "token"})
+            if u.path == "/gameicon":  # icona vera di un gioco (presa dal suo .exe)
+                f = gameicons.path_for(qs.get("id", [""])[0])
+                if not os.path.isfile(f):
+                    return self._send(404, b"", "text/plain")
+                with open(f, "rb") as fh:
+                    data = fh.read()
+                return self._send(200, data, "image/jpeg" if data[:3] == b"\xff\xd8\xff" else "image/png")
             if u.path == "/report":
                 name = os.path.basename(qs.get("f", [""])[0])
                 path = os.path.join(REPORTS, name)
@@ -673,7 +678,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/driver":
             return driver_report(fresh=True)
         if path == "/api/processes":
-            return {"items": game_candidates()}
+            return game_candidates()
         if path == "/api/ping":
             return {"ok": True}
         if path == "/api/overlays":

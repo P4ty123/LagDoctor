@@ -28,6 +28,7 @@ PROVE = [
     ("t_cputopo.py", "processori: affinita' dei core"),
     ("t_eco.py", "processori: modalita' efficienza"),
     ("t_fixpc.py", "Fix PC: catalogo dei comandi ed esecuzione"),
+    ("t_giochi.py", "Analizza gioco: giochi aperti e loghi dei giochi"),
 ]
 
 

@@ -1008,94 +1008,157 @@ async function startupProcesses() {
 
 /* ------------------------------------------------------------------ GAME MODE */
 const GM_SRC = { steam: "Steam", epic: "Epic Games", gog: "GOG", xbox: "Xbox / Game Pass", ubisoft: "Ubisoft", pc: "Installato", java: "Java", manuale: "aggiunto da te" };
-function gmStatus(st, cfg) {
-  if (!cfg.enabled) return { cls: "", title: "Spenta", text: "La game mode non e' attiva. Accendila: partira' da sola con Windows e si attivera' quando apri uno dei giochi qui sotto." };
-  if (!st.running) return { cls: "b-warn", title: "Non in esecuzione", text: "La game mode e' accesa ma il suo programma invisibile non sta girando. Spegnila e riaccendila." };
-  if (st.active) return { cls: "b-ok", title: "ATTIVA: " + (st.games || []).join(", "), text: "Il PC sta dando il massimo al gioco. Quando lo chiudi, tutto torna com'era." };
-  return { cls: "b-acc", title: "In attesa di un gioco", text: "Appena apri uno dei giochi attivi qui sotto, la game mode si accende da sola." };
+/* icona di un gioco: logo del gioco (se e' nell'elenco dei famosi) > icona vera dal suo .exe > logo dello studio > lettera */
+const OWN_LOGOS = new Set(["counterstrike", "fortnite", "valorant", "leagueoflegends", "dota2", "pubg", "roblox", "fifa", "vrchat", "osu", "fivem"]);
+function gameLogo(name) {
+  if (typeof GAME_LOGOS === "undefined") return null;
+  const n = " " + String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() + " ";
+  for (const [ws, slug, c1, c2, fg] of GAME_LOGOS) if (ws.some((w) => n.includes(" " + w + " "))) return { slug, c1, c2, fg };
+  return null;
+}
+function gameIco(name, id, hasIcon) {
+  const l = gameLogo(name);
+  const logo = l && `<span class="gm-ico" style="background:linear-gradient(135deg,${l.c1},${l.c2})"><svg viewBox="0 0 24 24"><path d="${GAME_LOGO_PATHS[l.slug]}" fill="${l.fg}"/></svg></span>`;
+  if (l && OWN_LOGOS.has(l.slug)) return logo;
+  if (hasIcon && id) return `<span class="gm-ico img"><img alt="" src="/gameicon?id=${encodeURIComponent(id)}&t=${encodeURIComponent(window.LD_TOKEN)}"></span>`;
+  if (logo) return logo;
+  const cols = ["#7c5cff", "#00d4ff", "#2ee59d", "#ffb547", "#ff8a5c", "#f472b6", "#38bdf8", "#a78bfa"];
+  let h = 0; for (const ch of String(name || "?")) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const c = cols[h % cols.length];
+  return `<span class="gm-ico" style="background:${c}1f;color:${c}">${esc(String(name || "?").replace(/^the\s+/i, "").slice(0, 1).toUpperCase())}</span>`;
+}
+const GM_GROUPS = [
+  ["Il gioco", "#2ee59d", '<path d="M6 8h12a4 4 0 0 1 4 4v1.5a3.5 3.5 0 0 1-6.3 2.1L14.5 14h-5l-1.2 1.6A3.5 3.5 0 0 1 2 13.5V12a4 4 0 0 1 4-4z"/><path d="M7 10.5v3M5.5 12h3M16 11h.01M18 13h.01"/>',
+    ["priority", "gpu_priority", "affinity", "timer", "qos"]],
+  ["Programmi in background", "#ffb547", '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 20h10"/><path d="M9 9h6"/>',
+    ["bg_priority", "bg_io", "vendor_priority", "eco_bg", "trim_ram", "close_onedrive"]],
+  ["Windows", "#38bdf8", '<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/>',
+    ["close_apps", "stop_services", "stop_updates", "maintenance", "close_shell"]],
+  ["Memoria, energia e scheda video", "#a78bfa", '<rect x="2.5" y="7" width="19" height="10" rx="1.5"/><path d="M6 17v3M10 17v3M14 17v3M18 17v3"/><rect x="6" y="10" width="4" height="4" rx=".5"/><rect x="14" y="10" width="4" height="4" rx=".5"/>',
+    ["standby_purge", "power_plan", "gpu_pref"]],
+];
+const GM_SHORT = { priority: "Priorita' del gioco", gpu_priority: "Priorita' della scheda video", affinity: "Core del processore scelti da LagDoctor",
+  timer: "Timer di sistema a 0,5 ms", qos: "Priorita' di rete al gioco", bg_priority: "Priorita' bassa ai programmi aperti",
+  bg_io: "Priorita' bassa a disco e memoria", vendor_priority: "Programmi del produttore del PC piu' leggeri", eco_bg: "Modalita' efficienza",
+  trim_ram: "Libera la loro RAM", close_onedrive: "OneDrive in pausa", close_apps: "Chiudi componenti inutili",
+  stop_services: "Ferma i servizi non necessari", stop_updates: "Blocca aggiornamenti e download", maintenance: "Manutenzione in pausa",
+  close_shell: "Chiudi Esplora risorse", standby_purge: "Svuota la memoria in standby se la RAM finisce",
+  power_plan: "Piano 'Prestazioni eccellenti'", gpu_pref: "Scheda video ad alte prestazioni" };
+const GM_PW = '<path d="M12 3v9"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/>';
+const icoSvg = (d) => `<svg viewBox="0 0 24 24">${d}</svg>`;
+function gmSince(t) {
+  if (!t) return "";
+  const m = Math.max(0, Math.round((Date.now() / 1000 - t) / 60));
+  return m < 1 ? "da meno di un minuto" : m === 1 ? "da 1 minuto" : m < 60 ? `da ${m} minuti` : `da ${Math.floor(m / 60)} h ${m % 60} min`;
 }
 async function gamemodePage(scanAgain) {
   let r;
   try { r = await api("/api/gamemode" + (scanAgain ? "?scan=1" : "")); }
   catch (e) { main().innerHTML = `<h1>Game mode</h1><div class="empty">Errore: ${esc(e.message)}</div>`; return; }
   if (S.page !== "gamemode") return;
-  const c = r.config, st = r.status, info = gmStatus(st, c);
-  const nOn = c.games.filter((g) => g.on).length;
-  const prioSel = (g) => `<select data-prio="${esc(g.id)}">${r.priorities.map((p) => `<option value="${p.id}" ${g.priority === p.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select>`;
-  const where = (g) => g.match === "java" ? "riconosciuto da Java (javaw.exe) con: " + (g.keywords || []).join(", ") : g.match === "name" ? (g.exe_names || []).join(", ") : g.dir;
-  main().innerHTML = `<h1>Game mode</h1>
-    <p class="sub">Quando apri un gioco, Windows si concentra al massimo su di lui: priorita' di CPU, GPU e rete, servizi e componenti inutili fermati, RAM liberata. Quando chiudi il gioco, tutto torna esattamente com'era.</p>
-    <div class="card" id="gm-status">
-      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-        <span class="badge ${info.cls}" style="font-size:14px;padding:6px 12px">${esc(info.title)}</span>
-        <div class="grow mut" style="flex:1;min-width:200px">${esc(info.text)}</div>
-        ${st.active ? '<button id="gm-ver-btn">Verifica ottimizzazioni</button>' : ""}
-        ${c.enabled ? '<button class="ghost" id="gm-off">Spegni la game mode</button>' : '<button id="gm-on">Accendi la game mode</button>'}
-      </div>
-      ${c.enabled ? `<p class="mut" style="font-size:12px;margin:10px 0 0">${st.autostart ? "Parte da sola con Windows." : "Avvio con Windows non attivo."} ${nOn} giochi controllati. Le opzioni valgono dalla prossima apertura del gioco.</p>` : ""}
-      ${(st.actions || []).length ? `<details ${st.active ? "open" : ""} style="margin-top:10px"><summary>Cosa ha fatto ${st.active ? "ora" : "l'ultima volta"}</summary><ul>${st.actions.map((a) => "<li>" + esc(a) + "</li>").join("")}</ul></details>` : ""}
-      ${(st.errors || []).length ? `<ul style="color:#e8a23a">${st.errors.map((a) => "<li>" + esc(a) + "</li>").join("")}</ul>` : ""}
+  S.gmData = r;
+  const c = r.config, st = r.status;
+  const nOn = c.games.filter((g) => g.on).length, optOn = r.options.filter((o) => c.opts[o.id]).length;
+  const icons = new Set(r.icons || []);
+  const playing = new Set((st.active ? st.games || [] : []).map((x) => String(x).toLowerCase()));
+  let state, k, title, sub;
+  if (!c.enabled) { state = "off"; k = "Spenta"; title = "La game mode e' spenta"; sub = "Accendila: parte da sola con Windows e si attiva quando apri uno dei giochi qui sotto."; }
+  else if (!st.running) { state = "warn"; k = "Non in esecuzione"; title = "Il programma della game mode non sta girando"; sub = "Spegnila e riaccendila con il tasto qui a sinistra."; }
+  else if (st.active) {
+    state = "on"; k = "Attiva"; title = esc((st.games || []).join(", ")) + ` <span>${gmSince(st.since)}</span>`;
+    sub = "Processore, scheda video e rete danno la precedenza al gioco. Quando lo chiudi, tutto torna com'era.";
+  } else { state = "ready"; k = "Pronta"; title = "In attesa di un gioco"; sub = "Si attiva da sola quando apri uno dei giochi accesi qui sotto."; }
+  const note = (id) => id === "affinity" ? (r.cpu && r.cpu.apply ? "si usa su questo processore" : "non serve su questo processore")
+    : id === "eco_bg" ? (r.eco && r.eco.apply ? "automatica" : "non serve su questo processore")
+    : id === "gpu_pref" ? (r.gpus && r.gpus.length >= 2 ? "" : "PC con due schede") : "";
+  const byId = Object.fromEntries(r.options.map((o) => [o.id, o]));
+  const grouped = new Set(GM_GROUPS.flatMap((g) => g[3]));
+  const groups = GM_GROUPS.map((g) => [...g.slice(0, 3), g[3].filter((id) => byId[id])]);
+  const rest = r.options.filter((o) => !grouped.has(o.id)).map((o) => o.id);
+  if (rest.length) groups.push(["Altro", "#94a3b8", '<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>', rest]);
+  main().innerHTML = `<h1>Game mode</h1><p class="sub">Quando apri un gioco, il PC lavora solo per lui. Quando lo chiudi, tutto torna esattamente com'era.</p>
+    <div class="gm-hero ${state}" id="gm-status">
+      <button class="gm-power" id="gm-power" title="${c.enabled ? "Spegni la game mode" : "Accendi la game mode"}">${icoSvg(GM_PW)}</button>
+      <div class="gm-state"><div class="gm-k">${k}</div><div class="gm-t">${title}</div><div class="gm-s">${sub}</div>
+        <div class="gm-links">${st.active ? '<a id="gm-ver-btn">Verifica ottimizzazioni</a>' : ""}${(st.actions || []).length ? `<a id="gm-acts">Cosa ha fatto ${st.active ? "ora" : "l'ultima volta"}</a>` : ""}
+          ${c.enabled && !st.active ? `<span>${st.autostart ? "Parte da sola con Windows" : "Avvio con Windows non attivo"}</span>` : ""}</div></div>
+      <div class="gm-nums"><div><b>${nOn}</b><small>giochi seguiti</small></div><div><b>${optOn}</b><small>azioni attive</small></div></div>
     </div>
-
-    <h2>Giochi</h2>
-    <p class="mut">${c.games.length} giochi trovati sul PC (Steam, Epic, GOG, Xbox/Game Pass, Ubisoft, EA, Battle.net, Riot, Minecraft...). La game mode si attiva solo per quelli accesi.${r.added ? ` <b>${r.added} nuovi trovati.</b>` : ""}</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <button class="ghost" id="gm-scan">Cerca di nuovo i giochi</button>
-      <button class="ghost" id="gm-add">Aggiungi un gioco</button>
-    </div>
-    ${c.games.length ? c.games.map((g) => `<div class="list-row gm-game">
-      <label class="switch"><input type="checkbox" data-on="${esc(g.id)}" ${g.on ? "checked" : ""}><span></span></label>
-      <div class="grow"><b>${esc(g.name)}</b> <span class="badge">${esc(GM_SRC[g.source] || g.source)}</span>${g.anticheat ? ` <span class="badge b-warn" title="Il processo del gioco e' protetto: LagDoctor non lo tocca. La priorita' la da' Windows stesso all'avvio del gioco (dalla seconda apertura); niente affinita' dei core.">anti-cheat: ${esc(g.anticheat)} &middot; metodo sicuro</span>` : ""}
-</div>
-      <span class="mut" style="font-size:12px">Priorita'</span> ${prioSel(g)}
-      <button class="ghost" data-rm="${esc(g.id)}" title="Togli dall'elenco">&times;</button>
-    </div>`).join("") : '<div class="empty">Nessun gioco trovato. Usa "Aggiungi un gioco" mentre il gioco e\' aperto.</div>'}
-    <h2>Cosa fa durante il gioco</h2>
-    ${r.options.map((o) => `<div class="list-row gm-opt">
-      <label class="switch"><input type="checkbox" data-opt="${o.id}" ${c.opts[o.id] ? "checked" : ""}><span></span></label>
-      <div class="grow"><div class="gm-opt-head"><span class="grow"><b>${esc(o.name)}</b>${o.default ? "" : ' <span class="badge">facoltativa</span>'}</span>
-        <button class="ghost sm" data-optdoc="${o.id}">${S.gmOpen && S.gmOpen.has(o.id) ? "▴ chiudi" : "▾ dettagli"}</button></div>
-        <div class="gm-opt-doc" id="optdoc-${o.id}" ${S.gmOpen && S.gmOpen.has(o.id) ? "" : "hidden"}>
-        <div class="mut" style="font-size:13px">${esc(o.what)}</div>
-        ${o.id === "affinity" ? `<div style="font-size:13px;margin-top:6px;padding:8px 10px;border-radius:8px;background:rgba(127,127,127,.12)"><b>Il tuo processore${r.cpu && r.cpu.cpu ? " (" + esc(r.cpu.cpu) + ")" : ""}:</b> ${r.cpu ? (r.cpu.apply ? "<b>affinita' utile</b>, verra' applicata. " : "<b>affinita' non utile</b>, non verra' applicata. ") + esc(r.cpu.why || "") : "non leggibile."}</div>` : ""}
-        ${o.id === "eco_bg" ? `<div style="font-size:13px;margin-top:6px;padding:8px 10px;border-radius:8px;background:rgba(127,127,127,.12)"><b>Il tuo processore${r.cpu && r.cpu.cpu ? " (" + esc(r.cpu.cpu) + ")" : ""}:</b> ${r.eco ? (r.eco.apply ? "<b>modalita' efficienza utile</b>, verra' usata. " : "<b>non serve</b>, resta la priorita' bassa. ") + esc(r.eco.why || "") : "non leggibile."}</div>` : ""}
-        ${o.id === "gpu_pref" ? `<div style="font-size:13px;margin-top:6px;padding:8px 10px;border-radius:8px;background:rgba(127,127,127,.12)"><b>Schede video di questo PC:</b> ${r.gpus && r.gpus.length ? esc(r.gpus.join(", ")) : "non leggibili"}. ${r.gpus && r.gpus.length >= 2 ? "<b>Due schede video</b>: l'opzione serve." : "<b>Una sola scheda video</b>: anche accesa non fa niente."}</div>` : ""}
-        <div style="font-size:12px;margin-top:3px"><b>Possibili problemi:</b> <span class="mut">${esc(o.risk)}</span></div></div></div></div>`).join("")}
-    <p class="mut" style="font-size:12px">Niente priorita' "In tempo reale": puo' bloccare mouse, tastiera e audio.</p>`;
+    ${(st.errors || []).length ? `<ul class="gm-err">${st.errors.map((a) => "<li>" + esc(a) + "</li>").join("")}</ul>` : ""}
+    <div class="gm-sec"><h2>Giochi</h2><span class="mut gm-cnt">${c.games.length} trovati${r.added ? ` · <b>${r.added} nuovi</b>` : ""}</span><span class="grow"></span>
+      <button class="ghost sm" id="gm-scan">${icoSvg(ICP.refresh)}Cerca di nuovo</button><button class="ghost sm" id="gm-add">${icoSvg('<path d="M12 5v14M5 12h14"/>')}Aggiungi</button></div>
+    ${c.games.length ? `<div class="gm-games">${c.games.map((g) => {
+      const run = playing.has(String(g.name).toLowerCase());
+      return `<div class="gm-game ${g.on ? "" : "off"} ${run ? "run" : ""}">${gameIco(g.name, g.id, icons.has(g.id))}
+        <div class="grow gm-gname" data-game="${esc(g.id)}" title="Impostazioni del gioco"><b>${esc(g.name)}</b><small>${run ? '<i class="dot"></i>in gioco adesso' : esc(GM_SRC[g.source] || g.source || "")}${g.anticheat ? " · anti-cheat" : ""}</small></div>
+        <label class="switch"><input type="checkbox" data-on="${esc(g.id)}" ${g.on ? "checked" : ""}><span></span></label></div>`;
+    }).join("")}</div>` : '<div class="empty">Nessun gioco trovato. Usa "Aggiungi" mentre il gioco e\' aperto.</div>'}
+    <div class="gm-sec" style="margin-top:30px"><h2>Cosa fa durante il gioco</h2><span class="grow"></span><span class="mut gm-cnt">Clicca su una voce per sapere cosa fa</span></div>
+    <div class="gm-groups">${groups.map(([t, col, ic, ids]) => `<div class="gm-group"><div class="gm-gh"><span class="ci" style="color:${col}">${icoSvg(ic)}</span>${t}</div>
+      ${ids.map((id) => { const o = byId[id], n = note(id) || (o.default ? "" : "facoltativa");
+        return `<div class="gm-row"><label class="switch"><input type="checkbox" data-opt="${id}" ${c.opts[id] ? "checked" : ""}><span></span></label>
+          <span class="grow gm-oname" data-optdoc="${id}">${esc(GM_SHORT[id] || o.name)}</span>${n ? `<small>${esc(n)}</small>` : ""}</div>`; }).join("")}</div>`).join("")}</div>
+    <p class="mut" style="font-size:12px;margin-top:22px">Le modifiche valgono dalla prossima apertura del gioco. Niente priorita' "In tempo reale": puo' bloccare mouse, tastiera e audio.</p>`;
 
   const post = async (body, msg) => {
-    try { const r = await api("/api/gamemode", body); if (r && r.msg) toast(r.msg); else if (msg) toast(msg); }
+    try { const x = await api("/api/gamemode", body); if (x && x.msg) toast(x.msg); else if (msg) toast(msg); }
     catch (e) { toast("Errore: " + e.message); }
     gamemodePage();
   };
-  const on = $("#gm-on"), off = $("#gm-off");
-  if (on) on.onclick = () => { on.disabled = true; on.textContent = "Accendo..."; post({ action: "enable" }, "Game mode accesa"); };
-  if (off) off.onclick = () => { off.disabled = true; off.textContent = "Spengo e ripristino..."; post({ action: "disable" }); };
-  $("#gm-scan").onclick = () => { $("#gm-scan").textContent = "Cerco..."; gamemodePage(true); };
+  $("#gm-power").onclick = () => {
+    $("#gm-power").disabled = true;
+    if (c.enabled) { toast("Spengo la game mode e rimetto tutto com'era..."); post({ action: "disable" }); }
+    else post({ action: "enable" }, "Game mode accesa");
+  };
+  $("#gm-scan").onclick = () => { $("#gm-scan").disabled = true; toast("Cerco i giochi installati..."); gamemodePage(true); };
   $("#gm-add").onclick = gmAdd;
   $$("[data-on]").forEach((x) => x.onchange = () => post({ action: "game", id: x.dataset.on, on: x.checked }));
-  $$("[data-prio]").forEach((x) => x.onchange = () => post({ action: "game", id: x.dataset.prio, priority: x.value }, "Priorita' salvata"));
   $$("[data-opt]").forEach((x) => x.onchange = () => post({ action: "opt", id: x.dataset.opt, value: x.checked }));
-  /* dettagli di ogni opzione: si aprono e chiudono senza ricaricare la pagina */
-  $$("[data-optdoc]").forEach((btn) => btn.onclick = () => {
-    S.gmOpen = S.gmOpen || new Set();
-    const id = btn.dataset.optdoc, box = $("#optdoc-" + id), open = box.hidden;
-    box.hidden = !open; btn.textContent = open ? "▴ chiudi" : "▾ dettagli";
-    if (open) S.gmOpen.add(id); else S.gmOpen.delete(id);
-  });
-  $$("[data-rm]").forEach((x) => x.onclick = () => post({ action: "remove", id: x.dataset.rm }, "Tolto dall'elenco"));
+  $$("[data-optdoc]").forEach((x) => x.onclick = () => gmOptDialog(byId[x.dataset.optdoc], r));
+  $$("[data-game]").forEach((x) => x.onclick = () => gmGameDialog(c.games.find((g) => g.id === x.dataset.game), r, post));
+  const acts = $("#gm-acts"); if (acts) acts.onclick = () => { const m = modal(`<h2>Cosa ha fatto la game mode</h2><ul class="gm-actlist">${st.actions.map((a) => "<li>" + esc(a) + "</li>").join("")}</ul><div class="row" style="justify-content:flex-end"><button class="ghost" id="m-close">Chiudi</button></div>`); $("#m-close", m).onclick = closeModal; };
+  $$(".gm-ico img").forEach((im) => im.onerror = () => { const sp = im.parentNode; sp.classList.remove("img"); sp.textContent = "?"; });
   const nav = $("#nav-gm"); if (nav) nav.hidden = !st.active;
   S.gmGames = (st.games || []).join(", ");
   const vb = $("#gm-ver-btn"); if (vb) vb.onclick = gmVerifyDialog;
   clearInterval(S.sensorTimer);
+  let waitIcons = r.icons_pending ? 6 : 0;
   S.sensorTimer = setInterval(async () => {
     if (S.page !== "gamemode" || !$("#gm-status")) return clearInterval(S.sensorTimer);
+    if (!$("#modal").hidden) return;  /* non ridisegno sotto una finestra aperta */
     try {
       const n = await api("/api/gamemode");
-      if (n.status.active !== st.active || n.status.running !== st.running ||
+      const newIcons = (n.icons || []).length !== icons.size;
+      if (newIcons) waitIcons = 0; else if (waitIcons) waitIcons--;
+      if (n.status.active !== st.active || n.status.running !== st.running || newIcons ||
           (n.status.actions || []).length !== (st.actions || []).length) gamemodePage();
     } catch (e) { /* riprova al prossimo giro */ }
   }, 4000);
+}
+function gmOptDialog(o, r) {
+  if (!o) return;
+  const box = (html) => `<div class="gm-note">${html}</div>`;
+  const cpu = r.cpu && r.cpu.cpu ? " (" + esc(r.cpu.cpu) + ")" : "";
+  const extra = o.id === "affinity" ? box(`<b>Il tuo processore${cpu}:</b> ${r.cpu ? (r.cpu.apply ? "<b>affinita' utile</b>, verra' applicata. " : "<b>affinita' non utile</b>, non verra' applicata. ") + esc(r.cpu.why || "") : "non leggibile."}`)
+    : o.id === "eco_bg" ? box(`<b>Il tuo processore${cpu}:</b> ${r.eco ? (r.eco.apply ? "<b>modalita' efficienza utile</b>, verra' usata. " : "<b>non serve</b>, resta la priorita' bassa. ") + esc(r.eco.why || "") : "non leggibile."}`)
+    : o.id === "gpu_pref" ? box(`<b>Schede video di questo PC:</b> ${r.gpus && r.gpus.length ? esc(r.gpus.join(", ")) : "non leggibili"}. ${r.gpus && r.gpus.length >= 2 ? "<b>Due schede video</b>: l'opzione serve." : "<b>Una sola scheda video</b>: anche accesa non fa niente."}`) : "";
+  const m = modal(`<h2>${esc(o.name)}</h2><p>${esc(o.what)}</p>${extra}<p class="mut" style="font-size:13px"><b>Possibili problemi:</b> ${esc(o.risk)}</p>
+    ${o.default ? "" : '<p class="mut" style="font-size:12.5px">Facoltativa: spenta all\'inizio, accendila se ti serve.</p>'}
+    <div class="row" style="justify-content:flex-end"><button class="ghost" id="m-close">Chiudi</button></div>`);
+  $("#m-close", m).onclick = closeModal;
+}
+function gmGameDialog(g, r, post) {
+  if (!g) return;
+  const where = g.match === "java" ? "riconosciuto da Java (javaw.exe) con: " + (g.keywords || []).join(", ") : g.match === "name" ? (g.exe_names || []).join(", ") : g.dir;
+  const m = modal(`<div class="row" style="gap:14px;align-items:center;margin-bottom:6px">${gameIco(g.name, g.id, (r.icons || []).includes(g.id))}<div><h2 style="margin:0">${esc(g.name)}</h2><span class="mut" style="font-size:13px">${esc(GM_SRC[g.source] || g.source || "")}</span></div></div>
+    <p class="mut" style="font-size:12.5px;word-break:break-all">${esc(where || "")}</p>
+    ${g.anticheat ? `<div class="gm-note"><b>Anti-cheat: ${esc(g.anticheat)}.</b> Il processo del gioco e' protetto: LagDoctor non lo tocca. La priorita' la da' Windows stesso all'avvio del gioco (dalla seconda apertura); niente affinita' dei core.</div>` : ""}
+    <label class="mut" style="font-size:13px;display:block;margin:14px 0 6px">Priorita' del gioco</label>
+    <select id="m-prio">${r.priorities.map((p) => `<option value="${p.id}" ${g.priority === p.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select>
+    <div class="row" style="justify-content:space-between;margin-top:20px"><button class="ghost danger-t" id="m-rm">Togli dall'elenco</button><button class="ghost" id="m-close">Chiudi</button></div>`);
+  $("#m-close", m).onclick = closeModal;
+  $("#m-prio", m).onchange = (e) => { closeModal(); post({ action: "game", id: g.id, priority: e.target.value }, "Priorita' salvata"); };
+  $("#m-rm", m).onclick = () => { closeModal(); post({ action: "remove", id: g.id }, "Tolto dall'elenco"); };
 }
 /* verifica dal vivo delle ottimizzazioni della game mode: pannello a parte, si aggiorna da solo */
 function gmVerifyHtml(r) {
@@ -1124,7 +1187,8 @@ async function gmVerifyDialog() {
   load();
 }
 async function gmAdd() {
-  const r = await api("/api/processes");
+  const pr = await api("/api/processes");
+  const r = { items: pr.items.concat(pr.others || []) };
   const m = modal(`<h2>Aggiungi un gioco</h2>
     <p class="mut">Apri il gioco, poi sceglilo qui sotto. Oppure scrivi il percorso del file .exe.</p>
     ${r.items.length ? r.items.map((p, i) => `<div class="list-row"><div class="grow"><b>${esc(p.name)}</b> <span class="mut">${p.mem} MB</span><div class="mut" style="font-size:12px;word-break:break-all">${esc(p.exe || "")}</div></div><button data-add="${i}" ${p.exe ? "" : "disabled"}>Aggiungi</button></div>`).join("") : '<div class="empty">Nessun programma grande aperto.</div>'}
@@ -1145,40 +1209,44 @@ async function record() {
   if (S.rec) return recordLive();
   if (S.lastRecord && S.lastRecord.result && !ctx.label) return recordResult(S.lastRecord.result);
   const r = await api("/api/processes");
+  const all = r.items.concat(S.recAll ? r.others || [] : []);
   let pick = r.items.length ? r.items[0].pid : null, dur = 300;
-  const DURS = [[60, "1", "min"], [180, "3", "min"], [300, "5", "min"], [600, "10", "min"], [1200, "20", "min"]];
+  const DURS = [60, 180, 300, 600, 1200];
   const durTxt = (v) => { const m = v / 60; return m + (m === 1 ? " minuto" : " minuti"); };
-  const nameOf = (pid) => { const p = r.items.find((x) => x.pid === pid); return p ? p.name : "–"; };
+  const nameOf = (pid) => { const p = all.find((x) => x.pid === pid); return p ? p.game || p.name : "–"; };
+  const gb = (m) => m >= 1024 ? (m / 1024).toFixed(1).replace(".", ",") + " GB di RAM" : m + " MB di RAM";
+  const row = (p) => `<div class="ag-item pick ${p.pid === pick ? "on" : ""}" data-pid="${p.pid}">${gameIco(p.game || p.name, p.game_id, p.icon)}
+    <div class="grow"><b>${esc(p.game || p.name)}</b><small>${p.source ? esc(GM_SRC[p.source] || p.source) + " · " : p.kind === "fullscreen" ? "a schermo intero · " : ""}${esc(p.name)}</small></div>
+    <small class="mut">${gb(p.mem)}</small><span class="ag-radio"></span></div>`;
   main().innerHTML = `${recHead("rec", REC_SUB)}
     ${ctx.label ? `<div class="banner"><b>Registrazione ${esc(ctx.label)} per il test Prima / Dopo</b>${ctx.game ? `<br>Usa lo stesso gioco (<b>${esc(ctx.game)}</b>) e, se puoi, la stessa zona e la stessa durata.` : ""}</div>` : ""}
-    <div class="steps">
-      <div class="step"><span>1</span><div><b>Apri il gioco</b><small>ed entra in partita</small></div></div>
-      <div class="step"><span>2</span><div><b>Scegli gioco e durata</b><small>torna qui con Alt+Tab</small></div></div>
-      <div class="step"><span>3</span><div><b>Torna a giocare</b><small>LagDoctor registra ogni frame</small></div></div>
-    </div>
-    <div class="rg-grid">
-      <div class="card"><div class="rg-ph"><h4>Scegli il gioco</h4>${actBtn('id="reload"', "refresh", "Aggiorna elenco", "sm", false)}</div>
-        <div id="procs">${r.items.length ? r.items.map((p) => `
-          <div class="proc pick ${p.likely ? "likely" : ""} ${p.pid === pick ? "on" : ""}" data-pid="${p.pid}">
-            <span class="pav">${esc((p.name || "?").replace(/\.exe$/i, "").slice(0, 1).toUpperCase())}</span>
-            <div class="grow"><b>${esc(p.name)}</b><small>${p.mem} MB di RAM</small></div>
-            ${p.likely ? '<span class="badge b-acc">probabile gioco</span>' : ""}<span class="pchk">✓</span></div>`).join("")
-          : '<div class="empty">Nessun gioco aperto: apri il gioco, entra in partita e premi Aggiorna elenco.</div>'}</div></div>
-      <div class="card"><h4>Durata della registrazione</h4>
-        <div class="durs" id="durs">${DURS.map(([v, n, u]) => `<a data-d="${v}" class="${v === dur ? "on" : ""}">${n}<small>${u}</small></a>`).join("")}</div>
-        <div class="rg-sum"><div><small>Gioco</small><b id="sum-game">${esc(nameOf(pick))}</b></div><div><small>Durata</small><b id="sum-dur">${durTxt(dur)}</b></div></div>
-        <button class="big" id="start" ${pick ? "" : "disabled"}><span class="rdot"></span>Avvia registrazione</button>
-        <p class="mut tiny">Dopo l'avvio torna nel gioco e gioca normalmente, soprattutto dove senti gli scatti. Alla fine LagDoctor ti mostra le cause e come risolverle.</p></div>
-    </div>`;
+    <div class="ag-steps"><span><i>1</i>Apri il gioco ed entra in partita</span><span class="ln"></span><span><i>2</i>Scegli gioco e durata (torna qui con Alt+Tab)</span><span class="ln"></span><span><i>3</i>Torna a giocare</span></div>
+    <div class="ag-grid"><div>
+      <div class="gm-sec"><h2>Giochi aperti</h2><span class="grow"></span>${actBtn('id="reload"', "refresh", "Aggiorna", "sm", false)}</div>
+      <div id="procs">${r.items.length ? `<div class="ag-list">${r.items.map(row).join("")}</div>`
+        : `<div class="ag-empty">${icoSvg(GM_GROUPS[0][2])}<b>Nessun gioco aperto</b><span>Apri il gioco, entra in partita e premi Aggiorna.</span></div>`}
+      ${S.recAll ? `<div class="gm-sec" style="margin-top:22px"><h2 style="font-size:15px">Altri programmi aperti</h2></div>${(r.others || []).length ? `<div class="ag-list">${r.others.map(row).join("")}</div>` : '<p class="mut">Nessun altro programma grande aperto.</p>'}` : ""}</div>
+      <p class="ag-note">Vengono mostrati solo i giochi: quelli installati sul PC (Steam, Epic, Xbox, Riot, EA, Ubisoft, Battle.net, GOG, Minecraft e quelli aggiunti nella game mode), quelli nelle cartelle dei giochi e i programmi a schermo intero che usano la scheda video per disegnare. Browser, Discord e gli altri programmi non compaiono.
+        <a id="rec-all">${S.recAll ? "Mostra solo i giochi" : "Il tuo gioco non c'e'? Mostra tutti i programmi aperti"}</a></p>
+    </div><div>
+      <div class="gm-sec"><h2>Durata</h2></div>
+      <div class="ag-durs" id="durs">${DURS.map((v) => `<a data-d="${v}" class="${v === dur ? "on" : ""}">${v / 60} min</a>`).join("")}</div>
+      <button class="big" id="start" style="width:100%;margin-top:18px" ${pick ? "" : "disabled"}><span class="rdot"></span>Avvia registrazione</button>
+      <p class="mut tiny" style="margin-top:12px"><span id="rec-sum">${pick ? `Registro <b>${esc(nameOf(pick))}</b> per <b>${durTxt(dur)}</b>. ` : ""}</span>Dopo l'avvio torna nel gioco e gioca normalmente, soprattutto dove senti gli scatti. Alla fine LagDoctor ti mostra le cause e come risolverle.</p>
+    </div></div>`;
   bindRecTabs();
+  const sum = () => { $("#rec-sum").innerHTML = pick ? `Registro <b>${esc(nameOf(pick))}</b> per <b>${durTxt(dur)}</b>. ` : ""; };
   $("#reload").onclick = record;
+  $("#rec-all").onclick = () => { S.recAll = !S.recAll; record(); };
+  $$(".gm-ico img").forEach((im) => im.onerror = () => { const sp = im.parentNode; sp.classList.remove("img"); sp.textContent = "?"; });
   $$("#procs .pick").forEach((el) => el.addEventListener("click", () => {
     pick = Number(el.dataset.pid); $$("#procs .pick").forEach((x) => x.classList.toggle("on", x === el));
-    $("#sum-game").textContent = nameOf(pick); $("#start").disabled = false;
+    sum(); $("#start").disabled = false;
   }));
   $$("#durs a").forEach((el) => el.addEventListener("click", () => {
-    dur = Number(el.dataset.d); $$("#durs a").forEach((x) => x.classList.toggle("on", x === el)); $("#sum-dur").textContent = durTxt(dur);
+    dur = Number(el.dataset.d); $$("#durs a").forEach((x) => x.classList.toggle("on", x === el)); sum();
   }));
+  if (r.icons_pending && !S.recIconRetry) { S.recIconRetry = true; setTimeout(() => { S.recIconRetry = false; if (S.page === "record" && !S.rec && $("#procs")) record(); }, 5000); }
   $("#start").onclick = async () => {
     try {
       const job = await api("/api/record", { pid: pick, seconds: dur, label: ctx.label || "" });
