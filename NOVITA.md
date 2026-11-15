@@ -1,3 +1,9 @@
+## LagDoctor 5.25.16
+
+- Menu a sinistra con scritte e icone piu' grandi; nuova icona (processore) per Ottimizzazioni.
+- Sotto le voci principali una linea separa la nuova sezione: Avvio automatico, Fix PC e Pulitore
+  (Fix PC e Pulitore sono in preparazione e arriveranno nei prossimi aggiornamenti).
+
 ## LagDoctor 5.25.15
 
 - Pulsanti in basso a sinistra (Impostazioni, Aggiornamenti, Cartella report, Ripristina tutto, Esci) piu' semplici:

@@ -153,7 +153,7 @@ async function go(page, opt = {}) {
   refreshState().catch(() => {});
   const old = main().firstElementChild;
   const fn = page === "record" ? ({ rec: record, exp, sessions })[S.recTab || "rec"]
-    : ({ home, scan, tweaks: tweaksPage, driver, startup, gamemode: gamemodePage, verifica: verificaPage })[page];
+    : ({ home, scan, tweaks: tweaksPage, driver, startup, gamemode: gamemodePage, verifica: verificaPage, fixpc: fixpcPage, pulitore: pulitorePage })[page];
   const p = Promise.resolve().then(fn).catch((e) => { main().classList.remove("sw-out", "fade"); throw e; });
   if (!anim) return p;
   const pp = p.catch(() => {});
@@ -772,6 +772,13 @@ function undoDialog() {
 }
 
 /* ------------------------------------------------------------------ DRIVER VIDEO */
+/* Schede in preparazione */
+function soonPage(title, sub) {
+  main().innerHTML = `<h1>${title}</h1><p class="sub">${sub}</p><div class="empty">In arrivo nei prossimi aggiornamenti.</div>`;
+}
+function fixpcPage() { soonPage("Fix PC", "Comandi per sistemare i problemi di Windows, con la spiegazione di cosa fa ognuno."); }
+function pulitorePage() { soonPage("Pulitore", "Pulizia dei file inutili che occupano spazio sul disco."); }
+
 async function driver() {
   main().innerHTML = '<div class="loading"><div class="spinner"></div><p>Leggo le impostazioni del driver video...</p></div>';
   let r;

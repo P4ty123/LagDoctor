@@ -478,3 +478,10 @@ body.resizing,body.resizing *{user-select:none!important}
 .side-foot button.act.danger{color:#ff8fa3}
 .side-foot button.act.danger .ic{background:none;color:inherit}
 .side-foot button.act.danger:hover{background:rgba(255,92,122,.10);color:#ffb3c1}
+nav a{font-size:16px}
+nav a i{font-size:20px;width:24px;line-height:1;display:inline-grid;place-items:center}
+nav a i svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav-sep{height:1px;background:var(--line2);margin:12px}
+.side-foot button.act.block{font-size:15px}
+.side-foot button.act.block .ic{width:22px;height:22px}
+.side-foot button.act.block .ic svg{width:18px;height:18px}
