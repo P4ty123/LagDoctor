@@ -1,3 +1,10 @@
+## LagDoctor 5.25.27
+
+- Finestra: corretto il crash che faceva comparire a caso la finestra di Edge con la barra scura. Succedeva
+  riaprendo LagDoctor subito dopo averlo chiuso (o dopo un crash): la finestra nuova partiva mentre WebView2 della
+  finestra di prima si stava ancora chiudendo. Ora LagDoctor aspetta che sia chiusa del tutto (al massimo qualche
+  secondo) e solo dopo apre la finestra.
+
 ## LagDoctor 5.25.26
 
 - Ottimizzazioni: tolto "dettagli" sotto le voci; per leggere la spiegazione basta cliccare sulla voce (il nome si
