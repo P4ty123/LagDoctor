@@ -1,3 +1,9 @@
+## LagDoctor 5.25.29
+
+- Impostazioni: nuovo "Ritardo all'avvio": scegli quanto aspetta LagDoctor dopo l'accesso a Windows prima di
+  partire, da subito a 60 secondi (prima era fisso a 15). L'attivita' 'LagDoctor Avvio' dell'Utilita' di
+  pianificazione viene aggiornata da sola.
+
 ## LagDoctor 5.25.28
 
 - Panoramica rinnovata: in alto il punteggio con lo stato del PC, i pulsanti principali e la game mode (si accende
