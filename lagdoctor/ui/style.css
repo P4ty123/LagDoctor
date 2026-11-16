@@ -603,3 +603,5 @@ nav a i svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.
 .bk-row b{display:block;font-weight:600}.bk-row small{color:var(--mut);font-size:12.5px}
 .bk-row .btns{display:flex;gap:8px}.bk-row .btns button{padding:7px 13px}
 .bk-row .btns .del{color:#ff8fa3}
+#tw-list .tw2 .name{cursor:pointer}
+#tw-list .tw2 .name:hover b{color:var(--a2)}

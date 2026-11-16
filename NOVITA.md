@@ -1,3 +1,8 @@
+## LagDoctor 5.25.26
+
+- Ottimizzazioni: tolto "dettagli" sotto le voci; per leggere la spiegazione basta cliccare sulla voce (il nome si
+  illumina quando ci passi sopra).
+
 ## LagDoctor 5.25.25
 
 - Ottimizzazioni: sotto ogni voce solo una frase breve; "dettagli" apre una finestrella sopra la pagina con la

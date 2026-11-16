@@ -609,7 +609,7 @@ function ovSwitchHtml(t) {
 }
 function rowHtml(t) {
   return `<div class="tw2 ${S.sel.has(t.id) ? "sel" : ""}" data-id="${t.id}">
-    <div class="tx name"><b>${esc(t.name)}</b><div>${esc(t.short || t.desc || (t.doc && t.doc.cosa) || "")} <span class="info-hint">dettagli</span> ${actionHtml(t)}</div></div>
+    <div class="tx name"><b>${esc(t.name)}</b><div>${esc(t.short || t.desc || (t.doc && t.doc.cosa) || "")} ${actionHtml(t)}</div></div>
     <div class="right"><span class="stc">${stateHtml(t)}</span>${dotsHtml(t)}<span class="risk ${RISK_CLS[t.risk] || "m"}">${esc(t.risk_label)}</span>${switchHtml(t)}</div>
   </div>`;
 }
