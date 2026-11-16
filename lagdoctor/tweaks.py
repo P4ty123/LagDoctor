@@ -1631,15 +1631,16 @@ def revert_all():
     return msgs
 
 
-def create_restore_point():
+def create_restore_point(description="LagDoctor"):
     """Crea un punto di ripristino di Windows. Restituisce (ok, messaggio)."""
+    description = description.replace("'", " ")[:200]
     try:
         reg_write("HKLM", r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore",
                   "SystemRestorePointCreationFrequency", DWORD, 0)
     except Exception:
         pass
     code, out = ps("Enable-ComputerRestore -Drive \"$env:SystemDrive\\\" -ErrorAction SilentlyContinue; "
-                   "Checkpoint-Computer -Description 'LagDoctor' -RestorePointType 'MODIFY_SETTINGS' "
+                   "Checkpoint-Computer -Description '" + description + "' -RestorePointType 'MODIFY_SETTINGS' "
                    "-ErrorAction Stop; 'OK'", timeout=300)
     return out.strip().endswith("OK"), out[-300:]
 

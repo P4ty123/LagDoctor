@@ -274,7 +274,7 @@ doc("nagle",
     "prima di confermare i dati ricevuti. LagDoctor imposta su ogni scheda di rete in uso TcpAckFrequency = 1 e "
     "TCPNoDelay = 1 (niente raggruppamento) e TcpDelAckTicks = 0 (conferma subito, senza attesa).",
     "Nei giochi che usano TCP (alcuni MMO, giochi vecchi) i comandi partono subito invece di aspettare.",
-    "La maggior parte degli sparatutto usa UDP: nessun effetto. Un po' piu' di traffico di rete.")
+    "Un po' piu' di traffico di rete.")
 doc("net_throttle",
     "Network Throttling limita il numero di pacchetti di rete elaborati quando riproduci audio o video.",
     "In un test pubblicato e' stato l'unico tweak di rete a ridurre il ping in alcuni giochi.",

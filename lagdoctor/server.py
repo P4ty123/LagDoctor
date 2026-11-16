@@ -24,6 +24,7 @@ from . import autostart
 from . import verifica
 from . import fixpc
 from . import gamedetect, gameicons
+from . import backups, tweak_short
 from . import __version__, pdh, settings, tray, updater
 from . import gpu as gpumod
 from .main import BACKUP, GAME_HINTS, NOT_GAMES, REPORTS, ROOT, TOOLS
@@ -156,6 +157,7 @@ def tweak_json(t, st, applied, sysinfo, ignored=frozenset()):
             "harm_if_off": t.harm_if_off, "group": t.group, "source": t.source,
             "recommended": t.recommended(sysinfo), "status": st.get(t.id), "applied": t.id in applied,
             "needs_path": isinstance(t, tweaks.DefenderExclusionTweak), "doc": tweak_docs.get(t.id),
+            "short": (tweak_short.get(t.id) or {}).get("short"), "sum": (tweak_short.get(t.id) or {}).get("sum"),
             "note": getattr(t, "note", None), "manual": bool(getattr(t, "manual", False)),
             "how": getattr(t, "how", None), "how_ld": getattr(t, "how_ld", None),
             "closes": getattr(t, "closes", None), "running": t.running() if hasattr(t, "running") else []}
@@ -385,7 +387,7 @@ def job_scan(job):
 def job_apply(job, ids, paths):
     if not STATE["restore_done"]:
         job.msg("Creo un punto di ripristino di Windows (puo' richiedere 1-2 minuti)...")
-        ok, msg = tweaks.create_restore_point()
+        ok, msg = tweaks.create_restore_point("LagDoctor: prima di applicare %d modific%s" % (len(ids), "a" if len(ids) == 1 else "he"))
         job.msg("Punto di ripristino creato." if ok else "Punto di ripristino NON creato (%s). Ogni modifica ha "
                                                           "comunque il suo backup." % msg[-120:])
         STATE["restore_done"] = True
@@ -674,6 +676,12 @@ class Handler(BaseHTTPRequestHandler):
             return catalog_json()
         if path == "/api/fixpc":
             return fixpc.catalog()
+        if path == "/api/backups":
+            try:
+                points, err = backups.restore_points(), None
+            except Exception as e:
+                points, err = [], str(e)
+            return {"points": points, "error": err, "changes": backups.changes()}
         if path == "/api/autostart":
             return autostart.list_items(include_windows=qs.get("all", ["0"])[0] == "1")
         if path == "/api/startup":
@@ -752,13 +760,28 @@ class Handler(BaseHTTPRequestHandler):
             STATE["boot_job"] = job.id
             return 200, job.as_dict()
         if path in ("/api/scan", "/api/apply", "/api/revert", "/api/restore_all", "/api/record", "/api/check",
-                    "/api/verifica", "/api/fixpc/run"):
+                    "/api/verifica", "/api/fixpc/run", "/api/backups/create"):
             if STATE["busy"] and JOBS.get(STATE["busy"]) and JOBS[STATE["busy"]].status == "running":
                 return 409, {"error": "C'e' gia' un'operazione in corso: aspetta che finisca."}
         if path == "/api/scan":
             job = start_job("scan", job_scan)
         elif path == "/api/verifica":
             job = start_job("verifica", job_verifica)
+        elif path == "/api/backups/create":
+            def _mk(job):
+                job.msg("Creo il backup (puo' richiedere 1-2 minuti)...")
+                ok, msg = backups.create()
+                if not ok:
+                    raise RuntimeError("Windows non ha creato il backup: " + msg.strip()[-200:])
+                STATE["restore_done"] = True
+                return {"ok": True}
+            job = start_job("backup", _mk)
+        elif path in ("/api/backups/delete", "/api/backups/restore"):
+            try:
+                fn = backups.delete if path.endswith("delete") else backups.restore
+                return 200, {"ok": True, "msg": fn(int(b.get("seq", -1)))}
+            except Exception as e:
+                return 400, {"error": str(e)}
         elif path == "/api/fixpc/run":
             fid = b.get("id", "")
             if fid not in fixpc.BY_ID:
@@ -874,7 +897,7 @@ class Handler(BaseHTTPRequestHandler):
             return 200, {"ok": True}
         else:
             return 404, {"error": "sconosciuto"}
-        if job.kind in ("scan", "apply", "revert", "restore_all", "record", "check", "fixpc"):
+        if job.kind in ("scan", "apply", "revert", "restore_all", "record", "check", "fixpc", "backup"):
             STATE["busy"] = job.id
         return 200, job.as_dict()
 

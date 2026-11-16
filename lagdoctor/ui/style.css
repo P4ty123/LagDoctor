@@ -580,3 +580,26 @@ nav a i svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.
 .ag-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:34px 10px;color:var(--mut);text-align:center}
 .ag-empty svg{width:40px;height:40px;fill:none;stroke:currentColor;stroke-width:1.6;opacity:.6}.ag-empty b{color:var(--fg)}
 @media (max-width:1000px){.ag-grid{grid-template-columns:1fr}}
+
+/* Dettagli delle voci: finestrella */
+.modal.soft{background:rgba(3,4,10,.5)}
+.modal-card.doc3{width:min(500px,92vw);padding:22px 24px 20px}
+.doc3 .hd{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px}
+.doc3 h2{margin:0;font-size:17px;flex:1}
+.doc3 .x{background:none;border:0;box-shadow:none;color:var(--mut);font-size:22px;line-height:1;padding:0 6px;cursor:pointer}
+.doc3 .x:hover{color:var(--fg);transform:none}
+.doc3 .sum{font-weight:600;font-size:15px;line-height:1.5;margin:0 0 12px;color:var(--fg)}
+.doc3 p{margin:0 0 10px;color:var(--mut);font-size:13.5px;line-height:1.6}
+.doc3 p b{color:var(--fg)}
+.doc3 .warn{color:#ffb547}.doc3 .warn b{color:#ffc874}
+.doc3 p:last-child{margin-bottom:0}
+/* Backups */
+.bk-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}.bk-head h1{margin:0;flex:1}
+.bk-sec{display:flex;align-items:center;gap:10px;margin:28px 0 4px}.bk-sec h2{margin:0;font-size:17px;text-transform:none;letter-spacing:0;color:var(--fg)}
+.bk-row{display:flex;align-items:center;gap:14px;padding:12px 4px;border-bottom:1px solid var(--line)}
+.bk-row:last-child{border-bottom:0}
+.bk-ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex:none}
+.bk-ic svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.bk-row b{display:block;font-weight:600}.bk-row small{color:var(--mut);font-size:12.5px}
+.bk-row .btns{display:flex;gap:8px}.bk-row .btns button{padding:7px 13px}
+.bk-row .btns .del{color:#ff8fa3}

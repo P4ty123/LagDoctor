@@ -16,7 +16,7 @@ async function api(path, body) {
   return j;
 }
 function toast(msg, ms = 3500) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(() => (t.hidden = true), ms); }
-function modal(html) { $("#modal-card").className = "modal-card"; $("#modal-card").innerHTML = html; $("#modal").hidden = false; return $("#modal-card"); }
+function modal(html) { $("#modal").classList.remove("soft"); $("#modal-card").className = "modal-card"; $("#modal-card").innerHTML = html; $("#modal").hidden = false; return $("#modal-card"); }
 function closeModal() { $("#modal").hidden = true; }
 const reportUrl = (f) => "/report?f=" + encodeURIComponent(f) + "&t=" + encodeURIComponent(window.LD_TOKEN);
 const base = (p) => String(p || "").split(/[\\/]/).pop();
@@ -153,7 +153,7 @@ async function go(page, opt = {}) {
   refreshState().catch(() => {});
   const old = main().firstElementChild;
   const fn = page === "record" ? ({ rec: record, exp, sessions })[S.recTab || "rec"]
-    : ({ home, scan, tweaks: tweaksPage, driver, startup, gamemode: gamemodePage, verifica: verificaPage, fixpc: fixpcPage, pulitore: pulitorePage })[page];
+    : ({ home, scan, tweaks: tweaksPage, driver, startup, gamemode: gamemodePage, verifica: verificaPage, fixpc: fixpcPage, pulitore: pulitorePage, backups: backupsPage })[page];
   const p = Promise.resolve().then(fn).catch((e) => { main().classList.remove("sw-out", "fade"); throw e; });
   if (!anim) return p;
   const pp = p.catch(() => {});
@@ -503,6 +503,23 @@ function filtered() {
 function visible() {
   return filtered().filter((t) => !S.twCat || t.cat === S.twCat);
 }
+/* dettagli di una voce: finestrella sopra la pagina (che si scurisce un po') */
+function docModal(t) {
+  if (!t) return;
+  const d = t.doc || { cosa: t.desc, perche: "", problemi: "" };
+  const myth = t.kind === "myth";
+  const body = [d.cosa, d.perche].filter((x) => x && x !== t.sum).join(" ");
+  const prob = d.problemi && !/^nessuno/i.test(d.problemi.trim()) ? d.problemi : "";
+  const m = modal(`<div class="hd"><h2>${esc(t.name)}</h2><button class="x" id="m-close" title="Chiudi">&times;</button></div>
+    <p class="sum">${esc(t.sum || t.desc || "")}</p>
+    ${body ? `<p>${esc(body)}</p>` : ""}
+    ${t.how_ld ? `<p><b>Se lo spegni da LagDoctor:</b> ${esc(t.how_ld)}</p>` : ""}
+    ${t.how ? `<p><b>${t.manual ? "Come spegnerlo" : "Oppure dal programma"}:</b> ${esc(t.how)}</p>` : ""}
+    ${prob ? `<p class="warn"><b>${myth ? "Perche' e' meglio lasciarla disattivata" : "Possibili problemi"}:</b> ${esc(prob)}</p>` : ""}
+    ${t.warning && t.cat !== OV_CAT ? `<p class="warn"><b>Attenzione:</b> ${esc(t.warning)}</p>` : ""}`);
+  m.classList.add("doc3"); $("#modal").classList.add("soft");
+  $("#m-close", m).onclick = closeModal;
+}
 function docHtml(t) {
   const d = t.doc || { cosa: t.desc, perche: "", problemi: "" };
   const myth = t.kind === "myth";
@@ -563,7 +580,7 @@ function stateHtml(t) {
   return "";
 }
 function switchHtml(t) {
-  if (t.manual) return `<button class="ghost sm how-btn" data-how="${t.id}" title="Si spegne dal programma: ti dico dove">${S.open.has(t.id) ? "Chiudi" : "Come spegnerlo"}</button>`;
+  if (t.manual) return `<button class="ghost sm how-btn" data-how="${t.id}" title="Si spegne dal programma: ti dico dove">Come spegnerlo</button>`;
   if (t.kind === "overlay") return ovSwitchHtml(t);
   const on = isOn(t) || S.sel.has(t.id);
   let tip = "", dis = false;
@@ -592,9 +609,8 @@ function ovSwitchHtml(t) {
 }
 function rowHtml(t) {
   return `<div class="tw2 ${S.sel.has(t.id) ? "sel" : ""}" data-id="${t.id}">
-    <div class="tx name"><b>${esc(t.name)}</b><div>${t.cat === OV_CAT ? "" : esc(t.desc || (t.doc && t.doc.cosa) || "") + " "}<span class="info-hint">${S.open.has(t.id) ? "▴ chiudi" : "▾ dettagli"}</span> ${actionHtml(t)}</div></div>
+    <div class="tx name"><b>${esc(t.name)}</b><div>${esc(t.short || t.desc || (t.doc && t.doc.cosa) || "")} <span class="info-hint">dettagli</span> ${actionHtml(t)}</div></div>
     <div class="right"><span class="stc">${stateHtml(t)}</span>${dotsHtml(t)}<span class="risk ${RISK_CLS[t.risk] || "m"}">${esc(t.risk_label)}</span>${switchHtml(t)}</div>
-    ${S.open.has(t.id) ? docHtml(t) : ""}
   </div>`;
 }
 function renderTweaks() {
@@ -651,7 +667,7 @@ function renderTweaks() {
     </div>`).join("") : `<div class="empty">${S.filter === "ign" ? "Nessuna voce ignorata." : S.filter === "fix" ? "Niente da correggere qui." : "Nessuna voce con questi filtri."}</div>`);
   $$("#tw-list .tw2[data-id]").forEach((row) => {
     const id = row.dataset.id;
-    $(".name", row).addEventListener("click", () => { S.open.has(id) ? S.open.delete(id) : S.open.add(id); renderTweaks(); });
+    $(".name", row).addEventListener("click", () => docModal(tws().find((x) => x.id === id)));
   });
   $$("[data-sw]").forEach((cb) => cb.addEventListener("change", (e) => {
     const id = cb.dataset.sw, t = tws().find((x) => x.id === id);
@@ -669,7 +685,7 @@ function renderTweaks() {
     e.target.checked ? S.sel.add(id) : S.sel.delete(id);
     renderTweaks();
   }));
-  $$("[data-how]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); const id = b.dataset.how; S.open.has(id) ? S.open.delete(id) : S.open.add(id); renderTweaks(); }));
+  $$("[data-how]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); docModal(tws().find((x) => x.id === b.dataset.how)); }));
   $$("[data-undo]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); revertIds([b.dataset.undo]); }));
   $$("[data-off]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); forceOff(b.dataset.off); }));
   $$("[data-ign]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); setIgnored(b.dataset.ign, true); }));
@@ -793,6 +809,68 @@ function soonPage(title, sub) {
   main().innerHTML = `<h1>${title}</h1><p class="sub">${sub}</p><div class="empty">In arrivo nei prossimi aggiornamenti.</div>`;
 }
 function pulitorePage() { soonPage("Pulitore", "Pulizia dei file inutili che occupano spazio sul disco."); }
+
+/* ------------------------------------------------------------------ BACKUPS */
+const BK_RP = '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/>';
+const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+function dataIt(iso, ora = true) {
+  const d = new Date(iso);
+  if (isNaN(d)) return iso || "";
+  return `${d.getDate()} ${MESI[d.getMonth()]} ${d.getFullYear()}` + (ora ? `, ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : "");
+}
+async function backupsPage() {
+  main().innerHTML = '<div class="loading"><div class="spinner"></div><p>Leggo i backup...</p></div>';
+  let r;
+  try { r = await api("/api/backups"); } catch (e) { main().innerHTML = `<h1>Backups</h1><div class="empty">Errore: ${esc(e.message)}</div>`; return; }
+  if (S.page !== "backups") return;
+  const tile = (inner, col) => `<span class="bk-ic" style="color:${col};background:${col}1f">${inner}</span>`;
+  main().innerHTML = `<div class="bk-head"><h1>Backups</h1><button class="ghost" id="bk-new">+ Crea backup adesso</button></div>
+    ${r.error && !r.points.length ? `<div class="empty">Non riesco a leggere i backup di Windows: ${esc(r.error)}</div>`
+      : r.points.length ? r.points.map((p) => `<div class="bk-row">${tile(`<svg viewBox="0 0 24 24">${BK_RP}</svg>`, "#00d4ff")}
+        <div class="grow"><b>${esc(dataIt(p.time))}</b><small>${esc(p.note)}</small></div>
+        <div class="btns"><button class="ghost" data-rp="${p.seq}">Ripristina</button><button class="ghost del" data-rpdel="${p.seq}">Elimina</button></div></div>`).join("")
+      : '<div class="empty">Nessun backup.</div>'}
+    <div class="bk-sec"><h2>Modifiche di LagDoctor</h2><span class="grow"></span>${r.changes.length ? '<button class="ghost sm" id="bk-undoall">Annulla tutte</button>' : ""}</div>
+    ${r.changes.length ? r.changes.map((c) => {
+      const ic = CAT_IC[c.cat] || ["#a78bfa", '<rect x="6" y="6" width="12" height="12" rx="2"/>'];
+      return `<div class="bk-row">${tile(`<svg viewBox="0 0 24 24">${ic[1]}</svg>`, ic[0])}
+        <div class="grow"><b>${esc(c.name)}</b><small>${esc(c.cat)}${c.time ? " · applicata il " + esc(dataIt(c.time, false)) : ""}</small></div>
+        <div class="btns"><button class="ghost" data-undo1="${esc(c.id)}">Annulla modifica</button></div></div>`; }).join("")
+      : '<div class="empty">Nessuna modifica di LagDoctor attiva.</div>'}`;
+  const when = (seq) => dataIt((r.points.find((p) => p.seq === Number(seq)) || {}).time);
+  const ask = (title, text, okLabel, fn) => {
+    const m = modal(`<h2>${title}</h2><p>${text}</p><div class="row" style="justify-content:flex-end"><button class="ghost" id="m-cancel">Annulla</button><button id="m-ok">${okLabel}</button></div>`);
+    $("#m-cancel", m).onclick = closeModal;
+    $("#m-ok", m).onclick = async () => { $("#m-ok", m).disabled = true; $("#m-cancel", m).disabled = true; await fn(m); };
+  };
+  $("#bk-new").onclick = async () => {
+    const b = $("#bk-new"); b.disabled = true; b.textContent = "Creo il backup...";
+    try { await runJob(api("/api/backups/create", {})); toast("Backup creato"); }
+    catch (e) { toast("Errore: " + e.message, 7000); }
+    if (S.page === "backups") backupsPage();
+  };
+  $$("[data-rp]").forEach((b) => b.onclick = () => ask("Ripristinare questo backup?",
+    `Windows torna com'era il <b>${esc(when(b.dataset.rp))}</b>: impostazioni, registro, driver e programmi. I tuoi file personali (foto, documenti, salvataggi) non vengono toccati.<br><br><b>Il PC si riavvia subito</b> e ci mette qualche minuto: salva quello che stai facendo.`,
+    "Ripristina e riavvia", async (m) => {
+      try { await api("/api/backups/restore", { seq: Number(b.dataset.rp) }); m.innerHTML = "<h2>Ripristino avviato</h2><p>Il PC si sta riavviando...</p>"; }
+      catch (e) { closeModal(); toast("Errore: " + e.message, 8000); }
+    }));
+  $$("[data-rpdel]").forEach((b) => b.onclick = () => ask("Eliminare questo backup?",
+    `Il backup del <b>${esc(when(b.dataset.rpdel))}</b> verra' cancellato e non si potra' piu' usare.`, "Elimina", async () => {
+      try { const x = await api("/api/backups/delete", { seq: Number(b.dataset.rpdel) }); toast(x.msg || "Backup eliminato"); }
+      catch (e) { toast("Errore: " + e.message, 8000); }
+      closeModal(); backupsPage();
+    }));
+  const undo = async (ids) => {
+    try { await runJob(api("/api/revert", { ids })); toast(ids.length === 1 ? "Modifica annullata" : "Modifiche annullate"); }
+    catch (e) { toast("Errore: " + e.message, 7000); }
+    S.catalog = null; closeModal(); if (S.page === "backups") backupsPage();
+  };
+  $$("[data-undo1]").forEach((b) => b.onclick = () => { b.disabled = true; b.textContent = "Annullo..."; undo([b.dataset.undo1]); });
+  const all = $("#bk-undoall");
+  if (all) all.onclick = () => ask("Annullare tutte le modifiche?", `LagDoctor rimette com'erano tutte le ${r.changes.length} modifiche. Alcune valgono dal prossimo riavvio.`,
+    "Annulla tutte", () => undo(r.changes.filter((c) => c.known).map((c) => c.id)));
+}
 
 /* ------------------------------------------------------------------ Fix PC */
 const FX_IC = {
@@ -1710,7 +1788,7 @@ async function backgroundBoot(job) {
   setBooting(false);
   await loadCatalog(true).catch(() => {});
   /* aggiorno la pagina aperta, se mostra dati della scansione (non se c'e' una finestra aperta) */
-  if ($("#modal").hidden && ["home", "scan", "tweaks", "driver"].includes(S.page)) go(S.page, { quiet: true });
+  if ($("#modal").hidden && ["home", "scan", "tweaks"].includes(S.page)) go(S.page, { quiet: true });
   toast("Scansione delle impostazioni completata");
 }
 (async () => {
