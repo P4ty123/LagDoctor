@@ -7,7 +7,8 @@ from . import paths
 
 FILE = paths.data("impostazioni.json")
 TASK = "LagDoctor Avvio"
-DEFAULTS = {"autostart": False, "minimized": True, "animations": True, "new_window": True}
+DEFAULTS = {"autostart": False, "minimized": True, "animations": True, "new_window": True, "delay": 15}
+MAX_DELAY = 60  # secondi
 CREATE_NO_WINDOW = 0x08000000
 
 
@@ -39,12 +40,21 @@ def startup_cmd(d):
     return paths.gui_cmd("--avvio-windows", *(["--ridotto"] if d.get("minimized") else []))
 
 
+def delay_of(d):
+    """ritardo dell'avvio con Windows in secondi (0 = subito, massimo un minuto)."""
+    try:
+        return max(0, min(MAX_DELAY, int(d.get("delay", DEFAULTS["delay"]))))
+    except (TypeError, ValueError):
+        return DEFAULTS["delay"]
+
+
 def apply(d):
     """Crea o toglie l'avvio con Windows. Usa l'Utilita' di pianificazione (non il registro) perche' LagDoctor
     ha bisogno dei permessi di amministratore: cosi' parte senza la richiesta di conferma di Windows."""
     if d.get("autostart"):
+        delay = delay_of(d)
         code, out = _run(["schtasks", "/Create", "/TN", TASK, "/TR", paths.quote(startup_cmd(d)), "/SC", "ONLOGON",
-                          "/RL", "HIGHEST", "/DELAY", "0000:15", "/F"])
+                          "/RL", "HIGHEST", *(["/DELAY", "%04d:%02d" % (delay // 60, delay % 60)] if delay else []), "/F"])
         if code != 0:
             raise RuntimeError("non riesco a creare l'avvio con Windows: " + out[-200:])
     else:

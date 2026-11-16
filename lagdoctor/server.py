@@ -859,7 +859,7 @@ class Handler(BaseHTTPRequestHandler):
             d = settings.load()
             for k in settings.DEFAULTS:
                 if k in b:
-                    d[k] = bool(b[k])
+                    d[k] = settings.delay_of({"delay": b[k]}) if k == "delay" else bool(b[k])
             if set(b) <= {"animations", "new_window"}:  # niente da cambiare nell'avvio con Windows
                 if b.get("new_window"):
                     reset_webview_failures()

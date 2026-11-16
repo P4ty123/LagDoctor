@@ -1771,8 +1771,11 @@ async function settingsDialog() {
       <label class="switch"><input type="checkbox" id="${id}" ${on ? "checked" : ""} ${dis ? "disabled" : ""}><span></span></label>
       <div class="grow"><b>${title}</b><div class="mut" style="font-size:13px">${txt}</div></div></div>`;
   const m = modal(`<h2>Impostazioni</h2>
-    ${row("set-auto", "Avvia LagDoctor con Windows", "LagDoctor si apre da solo circa 15 secondi dopo l'accesso a Windows, gia' con i permessi di amministratore (nessuna richiesta di conferma). L'hardware non viene riletto: le impostazioni si controllano in background.", s.autostart)}
+    ${row("set-auto", "Avvia LagDoctor con Windows", "LagDoctor si apre da solo dopo l'accesso a Windows, gia' con i permessi di amministratore (nessuna richiesta di conferma). Usa l'Utilita' di pianificazione di Windows (attivita' 'LagDoctor Avvio').", s.autostart)}
     ${row("set-min", "Ridotto a icona", "All'avvio con Windows LagDoctor parte solo come icona vicino all'orologio, senza aprire la finestra: clicca l'icona quando ti serve.", s.minimized, !s.autostart)}
+    <div class="list-row set-delay ${s.autostart ? "" : "off"}" style="align-items:flex-start"><span class="sd-ic">${hsv("temp").replace(HI.temp, '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/>')}</span>
+      <div class="grow"><b>Ritardo all'avvio</b><div class="mut" style="font-size:13px">Quanto aspetta LagDoctor dopo l'accesso a Windows prima di partire.</div>
+        <div class="sd-row"><input type="range" id="set-delay" min="0" max="60" step="5" value="${s.delay ?? 15}" ${s.autostart ? "" : "disabled"}><b id="set-delay-v"></b></div></div></div>
     ${row("set-newwin", "Finestra senza barra di Edge", "Usa la finestra nuova, con la barra del titolo di LagDoctor al posto di quella grigia di Edge. Se va in errore LagDoctor riprova una volta con la grafica in modalita' software, poi torna da solo alla finestra di Edge. Vale dalla prossima apertura: <b>Esci</b> e riapri LagDoctor." + (s.new_window && s.new_window_failed ? " <b>Ultimo tentativo andato in errore</b>: dettagli in errore-finestra.txt (cartella dei dati)." : ""), s.new_window === true)}
     ${row("set-anim", "Animazioni", "Quando cambi scheda la pagina vecchia scompare e la nuova entra con un'animazione. Spegnile per cambi di scheda istantanei.", s.animations !== false)}
     <p class="mut" style="font-size:12.5px">Chiudendo la finestra con la X, LagDoctor resta acceso tra le icone vicino all'orologio (in basso a destra). Per chiuderlo davvero: tasto destro sull'icona &gt; <b>Esci</b>, oppure il pulsante Esci qui a sinistra.</p>
@@ -1783,9 +1786,17 @@ async function settingsDialog() {
   const save = async () => {
     try {
       const r = await api("/api/settings", { autostart: $("#set-auto", m).checked, minimized: $("#set-min", m).checked });
-      $("#set-min", m).disabled = !r.autostart;
+      $("#set-min", m).disabled = !r.autostart; dl.disabled = !r.autostart; $(".set-delay", m).classList.toggle("off", !r.autostart);
       toast(r.autostart ? (r.minimized ? "LagDoctor partira' con Windows, ridotto a icona" : "LagDoctor partira' con Windows") : "Avvio con Windows disattivato");
     } catch (e) { toast("Errore: " + e.message); }
+  };
+  const dTxt = (v) => Number(v) === 0 ? "subito" : v + " secondi";
+  const dl = $("#set-delay", m), dv = $("#set-delay-v", m);
+  dv.textContent = dTxt(dl.value);
+  dl.oninput = () => { dv.textContent = dTxt(dl.value); };
+  dl.onchange = async () => {
+    try { const r = await api("/api/settings", { delay: Number(dl.value) }); toast(r.delay ? `LagDoctor partira' ${r.delay} secondi dopo l'accesso a Windows` : "LagDoctor partira' subito all'accesso a Windows"); }
+    catch (e) { toast("Errore: " + e.message); }
   };
   $("#set-verify", m).onclick = () => { closeModal(); go("verifica"); };
   $("#set-auto", m).onchange = save;
