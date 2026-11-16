@@ -1254,6 +1254,13 @@ class Engine:
             return
         j = self.j
         log("Disattivo la game mode (%s)" % reason)
+        try:
+            from . import activity
+            dur = time.time() - float(j.get("since") or time.time())
+            if dur >= 60 and j.get("games"):
+                activity.add("gamemode", "Game mode su «%s» per %s" % (", ".join(j["games"]), activity.durata(dur)), "gamemode")
+        except Exception:
+            pass
         # PRIMA di tutto Esplora risorse: barra delle applicazioni e desktop tornano subito (il resto, piu' lento,
         # viene ripristinato dopo, mentre usi gia' il PC)
         self.restore_shell()

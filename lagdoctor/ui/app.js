@@ -249,20 +249,6 @@ function scoreText(score, fixN, probs) {
   parts.push(hi ? `${hi} problem${hi === 1 ? "a importante" : "i importanti"} nel controllo rapido.` : (probs || []).length ? `${probs.length} consigli nel controllo rapido.` : "Nessun problema trovato.");
   return { title, text: parts.join("<br>") };
 }
-function gmHomeHtml(gm) {
-  if (!gm) return "";
-  let st, cls, items = [];
-  if (!gm.enabled) { st = "Game mode spenta"; cls = ""; items = ["Accendila: quando apri un gioco Windows si concentra su di lui", "Si spegne da sola quando chiudi il gioco"]; }
-  else if (gm.active) {
-    st = "Game mode attiva · " + (gm.games || []).join(", "); cls = "on";
-    items = (gm.actions || []).filter((a) => !/^Game mode ATTIVA/.test(a)).slice(-4).map((a) => a.length > 70 ? a.slice(0, 68) + "…" : a);
-  } else if (gm.running) { st = "Game mode pronta"; cls = "wait"; items = [`Controllo ${gm.n_games} giochi`, "Si attiva da sola quando apri un gioco"]; }
-  else { st = "Game mode accesa ma non in esecuzione"; cls = ""; items = ["Apri la pagina Game mode per riavviarla"]; }
-  return `<div class="card gmcard"><div class="gm-head"><div class="st"><span class="gdot ${cls}"></span>${esc(st)}</div>
-      <button class="act-arrow" data-go="gamemode" title="Vai alla Game mode" aria-label="Vai alla Game mode">${ic("arrow")}</button></div>
-    <ul>${items.map((x) => "<li>" + esc(x) + "</li>").join("")}</ul>
-    ${gm.active ? `<div class="acts row">${actBtn('id="home-gm-ver"', "scan", "Verifica ottimizzazioni", "sm")}</div>` : ""}</div>`;
-}
 function quickHtml(list) {
   if (!list || !list.length) return '<div class="mut" style="padding:8px 0">Nessun problema trovato.</div>';
   return list.slice().sort((a, b) => b.gravita - a.gravita).map((p) => `
@@ -272,62 +258,155 @@ function quickHtml(list) {
       <p class="mut" style="font-size:13px;margin:6px 0 0">${esc(p.spiegazione)}</p><p class="fix" style="font-size:13px">${esc(p.soluzione)}</p></details>
     </div>`).join("");
 }
+/* icone della Panoramica */
+const HI = {
+  cpu: '<rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M9 2.5V6M15 2.5V6M9 18v3.5M15 18v3.5M2.5 9H6M2.5 15H6M18 9h3.5M18 15h3.5"/>',
+  gpu: '<rect x="2" y="6" width="20" height="11" rx="2"/><circle cx="9" cy="11.5" r="2.8"/><path d="M15 9.5h4M15 13.5h4M5 17v2"/>',
+  ram: '<rect x="2.5" y="7" width="19" height="10" rx="1.5"/><path d="M6 17v3M10 17v3M14 17v3M18 17v3"/><rect x="6" y="10" width="4" height="4" rx=".5"/><rect x="14" y="10" width="4" height="4" rx=".5"/>',
+  temp: '<path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 9v7"/>',
+  disk: '<rect x="3" y="13" width="18" height="7" rx="2"/><path d="M5 13l2.5-8h9l2.5 8"/><path d="M7 16.5h.01M10.5 16.5h.01"/>',
+  win: '<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/>',
+  play: '<path d="M8 5v14l11-7z"/>', scan: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/>',
+  arch: '<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M10 13h4"/>',
+  rec: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>', check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  warn: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/>', power: '<path d="M12 3v9"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/>',
+  tune: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+};
+const hsv = (k) => `<svg viewBox="0 0 24 24">${HI[k]}</svg>`;
+const ACT_IC = { gamemode: ["play", "#2ee59d"], backup: ["arch", "#00d4ff"], tweaks: ["tune", "#a78bfa"], analisi: ["rec", "#ff5c7a"], fixpc: ["wrench", "#ff8a5c"] };
+function quando(t) {
+  const d = new Date(t * 1000), now = new Date();
+  const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(now) - day(d)) / 86400000);
+  return diff === 0 ? "oggi, " + hm : diff === 1 ? "ieri, " + hm : `${d.getDate()} ${MESI[d.getMonth()]}`;
+}
+function heroGmHtml(gm) {
+  if (!gm) return "";
+  let st, k, t, sub;
+  if (!gm.enabled) { st = "off"; k = "Spenta"; t = "Spenta"; sub = "Accendila: si attiva da sola quando apri un gioco"; }
+  else if (!gm.running) { st = "warn"; t = "Non in esecuzione"; sub = "Apri la pagina Game mode per riavviarla"; }
+  else if (gm.active) { st = "on"; t = esc((gm.games || []).join(", ")); sub = "Attiva: il PC lavora per il gioco"; }
+  else { st = "ready"; t = "Pronta"; sub = `Si attiva da sola quando apri uno dei tuoi ${gm.n_games} giochi`; }
+  return `<div class="hm-gm ${st}"><div class="hm-gmh" data-go="gamemode"><span class="dot"></span>Game mode</div><b data-go="gamemode">${t}</b><small>${sub}</small>
+    ${gm.active ? '<a class="hm-ver" id="home-gm-ver">Verifica ottimizzazioni</a>' : ""}
+    <button class="hm-pw" id="home-gm-pw" title="${gm.enabled ? "Spegni la game mode" : "Accendi la game mode"}">${hsv("power")}</button></div>`;
+}
 async function home() {
   await refreshState(); await loadCatalog();
   const si = S.state.sysinfo || {}, g = si.gpu || {};
   const fixN = toFix().length, probs = S.state.problems || [];
   const score = pcScore(fixN, probs), st = scoreText(score, fixN, probs);
-  main().innerHTML = `
-    <h1>Panoramica</h1><p class="sub">Il tuo PC in breve e le cose piu' importanti da fare.</p>
+  const H = S.homeData || {};
+  const ok = !fixN && !probs.some((p) => p.gravita >= 2);
+  const sub = [st.text.replace(/<br>/g, " ").replace(/\.\s*$/, ""), `${S.state.applied} ottimizzazion${S.state.applied === 1 ? "e" : "i"} di LagDoctor attive`,
+    H.last_backup ? "ultimo backup " + dataIt(H.last_backup).replace(/^(\d+ \w+) \d{4},/, "$1,") : ""].filter(Boolean).join(" · ");
+  const hw = (ic, col, k, v) => v ? `<div class="hm-hw"><span class="ci" style="color:${col}">${hsv(ic)}</span><span class="k">${k}</span><b>${esc(v)}</b></div>` : "";
+  main().innerHTML = `<h1>Panoramica</h1>
     ${S.state.experiment ? `<div class="banner"><b>Test prima/dopo in corso</b> su ${esc(S.state.experiment.gioco)}: quando sei pronto registra la partita DOPO. <button class="sm" data-go="exp">Vai</button></div>` : ""}
     ${!S.state.admin ? '<div class="banner">LagDoctor non ha i permessi di amministratore: avvialo di nuovo e rispondi Si.</div>' : ""}
-    <div class="hero">
-      ${S.booting ? `<div class="card">${bootCardHtml()}</div>` : `<div class="card score">
-        <div class="ring ${score >= 65 ? "" : score >= 45 ? "mid" : "low"}" style="--p:${score}"><div><div><b>${score}</b><small>su 100</small></div></div></div>
-        <div><h3>${st.title}</h3><p>${st.text}</p>
-        <div class="acts2">${fixN ? `<button data-go="tweaks">Correggi ora</button>` : ""}${actBtn('data-go="scan"', "scan", "Scansione completa")}</div></div></div>`}
-      ${gmHomeHtml(S.state.gm)}
+    <div class="hm-hero ${S.booting ? "" : ok ? "good" : score >= 45 ? "mid" : "low"}">
+      ${S.booting ? `<div class="hm-boot">${bootCardHtml()}</div>` : `
+      <div class="hm-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" class="bg"/><circle cx="60" cy="60" r="52" class="fg" stroke-dasharray="326.7" stroke-dashoffset="${(326.7 * (1 - score / 100)).toFixed(1)}"/></svg><div><b>${score}</b><small>su 100</small></div></div>
+      <div class="hm-hs"><div class="hm-k">${hsv(ok ? "check" : "warn")}${ok ? "Tutto a posto" : "Da sistemare"}</div>
+        <div class="hm-t1">${st.title}</div><div class="hm-s">${sub}</div>
+        <div class="hm-btns">${fixN ? `<button data-go="tweaks">${hsv("tune")}Correggi ora</button>` : ""}<button class="${fixN ? "ghost" : ""}" data-go="scan">${hsv("scan")}Scansione completa</button>
+          ${fixN ? "" : `<button class="ghost" data-go="record">${hsv("rec")}Analizza un gioco</button>`}</div></div>`}
+      ${heroGmHtml(S.state.gm)}
     </div>
-    <div class="sensors" id="home-sensors"></div>
-    <div class="two">
-      <div class="card"><h4>Il tuo PC</h4><div class="kv">
-        <div><span>Processore</span><b>${esc(si.cpu || "?")}</b></div>
-        <div><span>Scheda video</span><b>${esc(g.name || "?")}${g.vram_mb && !g.integrated ? " · " + Math.round(g.vram_mb / 1024) + " GB" : ""}</b></div>
-        <div><span>RAM</span><b>${esc(si.ram || "?")}</b></div>
-        <div><span>Modifiche di LagDoctor</span><b>${S.state.applied} attive</b></div></div></div>
-      <div class="card quick"><h4>Controllo rapido</h4>${S.booting ? '<div class="mut" style="padding:8px 0">Sto leggendo le impostazioni del sistema...</div>' : quickHtml(probs)}</div>
+    ${probs.length && !S.booting ? `<div class="hm-sec"><h2>Da sistemare</h2>${probs.length > 3 ? `<a class="hm-more" id="hm-more">${S.homeAllProbs ? "Mostra meno" : `Mostra tutti (${probs.length})`}</a>` : ""}</div>
+      <div class="hm-probs">${quickHtml(S.homeAllProbs ? probs : probs.slice().sort((a, b) => b.gravita - a.gravita).slice(0, 3))}</div>` : ""}
+    <div class="hm-sec"><h2>Adesso</h2><span class="mut">ultimi 60 secondi</span></div>
+    <div class="hm-ms" id="home-sensors"></div>
+    <div class="hm-cols">
+      <div><div class="hm-sec"><h2>Il tuo PC</h2></div>
+        ${hw("cpu", "#7c5cff", "Processore", si.cpu || "?")}
+        ${hw("gpu", g.vendor === "amd" ? "#ff5c5c" : g.vendor === "nvidia" ? "#76b900" : "#38bdf8", "Scheda video", (g.name || "?") + (g.vram_mb && !g.integrated ? " · " + Math.round(g.vram_mb / 1024) + " GB" : ""))}
+        ${hw("ram", "#ffb547", "RAM", si.ram || "?")}
+        ${hw("disk", "#a78bfa", "Disco di sistema", H.disk ? `${H.disk.drive} · ${H.disk.total_gb} GB · ${H.disk.free_gb} GB liberi` : "")}
+        ${hw("win", "#38bdf8", "Windows", H.windows || "")}
+      </div>
+      <div><div class="hm-sec"><h2>Attivita' recenti</h2></div><div id="home-act">${actHtml(H.activity)}</div></div>
     </div>`;
   $$("[data-go]").forEach((b) => b.addEventListener("click", () => { if (b.dataset.go === "tweaks") { S.filter = "fix"; S.twCat = ""; } if (b.dataset.go === "record") S.recTab = "rec"; go(b.dataset.go); }));
   bindFixButtons(main());
+  bindActs();
+  const more = $("#hm-more"); if (more) more.onclick = () => { S.homeAllProbs = !S.homeAllProbs; home(); };
   const hv = $("#home-gm-ver"); if (hv) { S.gmGames = ((S.state.gm || {}).games || []).join(", "); hv.onclick = gmVerifyDialog; }
+  const pw = $("#home-gm-pw");
+  if (pw) pw.onclick = async () => {
+    const on = (S.state.gm || {}).enabled; pw.disabled = true;
+    if (on) toast("Spengo la game mode e rimetto tutto com'era...");
+    try { const x = await api("/api/gamemode", { action: on ? "disable" : "enable" }); toast((x && x.msg) || (on ? "Game mode spenta" : "Game mode accesa")); }
+    catch (e) { toast("Errore: " + e.message); }
+    if (S.page === "home") home();
+  };
   startSensors($("#home-sensors"));
+  /* dati in piu' (attivita', backup, disco, Windows): arrivano dopo, senza rallentare l'apertura della pagina */
+  if (!S.homeLoading) {
+    S.homeLoading = true;
+    api("/api/home").then((d) => {
+      const changed = JSON.stringify(d) !== JSON.stringify(S.homeData || {});
+      S.homeData = d; S.homeLoading = false;
+      if (changed && S.page === "home" && $("#home-sensors") && $("#modal").hidden) home();
+    }).catch(() => { S.homeLoading = false; });
+  }
+}
+function actHtml(list) {
+  if (!list) return '<div class="mut" style="padding:8px 0">...</div>';
+  if (!list.length) return '<div class="mut" style="padding:8px 0">Ancora niente: qui compariranno partite con la game mode, backup, modifiche e analisi.</div>';
+  return list.map((a, i) => {
+    const ic = ACT_IC[a.kind] || ["check", "#94a3b8"];
+    const txt = esc(a.text).replace(/«(.*?)»/g, "<b>$1</b>");
+    return `<div class="hm-a ${a.link ? "link" : ""}" data-act="${i}"><span class="hm-ti" style="color:${ic[1]};background:${ic[1]}1f">${hsv(ic[0])}</span><div class="grow">${txt}</div><small>${quando(a.t)}</small></div>`;
+  }).join("");
+}
+function bindActs() {
+  const list = (S.homeData || {}).activity || [];
+  $$("#home-act [data-act]").forEach((el) => el.onclick = () => {
+    const a = list[Number(el.dataset.act)]; if (!a || !a.link) return;
+    if (a.link === "record") S.recTab = "sessions";
+    if (a.link === "tweaks") { S.filter = "all"; S.twCat = ""; }
+    go(a.link);
+  });
 }
 
-/* sensori della Panoramica: scheda video, processore e memoria */
+/* sensori della Panoramica: valore, dettaglio e grafico degli ultimi 60 secondi */
 const SENSOR_MAIN = [
-  ["gpu_util", "Utilizzo GPU", "g", (d) => fmt(d.gpu_util) + "%", (d) => d.gpu_util],
-  ["gpu_temp", "Temperatura GPU", "g", (d) => fmt(d.gpu_temp) + " °C" + (d.gpu_hotspot != null ? ` <span class="mut" style="font-size:13px;font-weight:500">hotspot ${fmt(d.gpu_hotspot)}</span>` : ""), (d) => Math.min(100, d.gpu_temp / 0.9), (d) => d.gpu_temp >= 83],
-  ["cpu_util", "Utilizzo CPU", "s", (d) => fmt(d.cpu_util) + "%", (d) => d.cpu_util],
-  ["ram_used", "Utilizzo RAM", "s", (d) => fmt(d.ram_pct) + "%", (d) => d.ram_pct, (d) => d.ram_pct >= 90],
+  ["cpu_util", "cpu", "#7c5cff", "Processore", "s", (d) => fmt(d.cpu_util) + "%", (d) => d.cpu_ghz ? fmt(d.cpu_ghz, 1).replace(".", ",") + " GHz" : "", 100],
+  ["gpu_util", "gpu", "#00d4ff", "Scheda video", "g", (d) => fmt(d.gpu_util) + "%",
+    (d) => [d.gpu_clock != null ? fmt(d.gpu_clock) + " MHz" : "", d.gpu_power != null ? fmt(d.gpu_power) + " W" : ""].filter(Boolean).join(" · "), 100],
+  ["gpu_temp", "temp", "#2ee59d", "Temperatura GPU", "g", (d) => fmt(d.gpu_temp) + " °C", (d) => d.gpu_hotspot != null ? "hotspot " + fmt(d.gpu_hotspot) + " °C" : "", 95],
+  ["ram_pct", "ram", "#ffb547", "Memoria", "s", (d) => fmt(d.ram_pct) + "%", (d) => `${fmt(d.ram_used, 1).replace(".", ",")} GB su ${fmt(d.ram_total, 0)} GB`, 100],
 ];
+function sparkSvg(pts, col, max) {
+  const w = 220, h = 44, n = 60;
+  if (!pts.length) return "";
+  const xs = (i) => ((i + n - pts.length) / (n - 1)) * w;
+  const ys = (v) => h - 3 - Math.max(0, Math.min(1, v / max)) * (h - 8);
+  const line = pts.map((v, i) => `${xs(i).toFixed(1)},${ys(v).toFixed(1)}`).join(" ");
+  const id = "sg" + col.slice(1);
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".35"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    <polygon points="${xs(0).toFixed(1)},${h} ${line} ${w},${h}" fill="url(#${id})"/><polyline points="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
+}
 function startSensors(box) {
-  box.innerHTML = SENSOR_MAIN.map(([k, l]) => `<div class="card kpi"><small>${l}</small><b id="s-${k}">–</b><div class="meter" id="m-${k}"><span></span></div><div class="sens-note" id="n-${k}"></div></div>`).join("");
+  S.sensHist = S.sensHist || {};
+  box.innerHTML = SENSOR_MAIN.map(([k, ic, col, label]) => `<div class="hm-m"><div class="hm-mh"><span class="ci" style="color:${col}">${hsv(ic)}</span>${label}</div>
+    <div class="hm-v" id="s-${k}">–</div><div class="hm-sub" id="n-${k}">&nbsp;</div><div class="hm-sp" id="g-${k}">${sparkSvg(S.sensHist[k] || [], col, SENSOR_MAIN.find((x) => x[0] === k)[7])}</div></div>`).join("");
   const flags = document.createElement("div"); flags.className = "sens-flags"; box.after(flags);
   const tick = async () => {
     if (!document.body.contains(box)) return clearInterval(S.sensorTimer);
     try {
       const r = await api("/api/sensors");
       const gd = r.available ? (r.data || {}) : {}, sd = r.sys || {};
-      SENSOR_MAIN.forEach(([k, , src, val, pct, hot]) => {
-        const d = src === "g" ? gd : sd, el = $("#s-" + k), m = $("#m-" + k), n = $("#n-" + k);
+      SENSOR_MAIN.forEach(([k, , col, , src, val, note, max]) => {
+        const d = src === "g" ? gd : sd, el = $("#s-" + k), n = $("#n-" + k), gr = $("#g-" + k);
         if (!el) return;
         const v = d[k];
         el.innerHTML = v == null ? "–" : val(d);
-        const p = v == null ? null : pct(d);
-        m.style.visibility = p == null ? "hidden" : "visible";
-        if (p != null) { $("span", m).style.width = Math.max(2, Math.min(100, p)) + "%"; m.classList.toggle("hot", !!(hot && hot(d))); }
-        if (k === "ram_used" && v != null) n.textContent = `${fmt(d.ram_used, 1).replace(".", ",")} GB usati su ${fmt(d.ram_total, 0)} GB`;
-        if (src === "g" && !r.available) n.textContent = k === "gpu_util" ? "sensori della scheda video non leggibili" : "";
+        n.innerHTML = v == null ? (src === "g" && !r.available && k === "gpu_util" ? "sensori non leggibili" : "&nbsp;") : (esc(note(d)) || "&nbsp;");
+        if (v != null) { const h = (S.sensHist[k] = (S.sensHist[k] || []).concat([v]).slice(-60)); gr.innerHTML = sparkSvg(h, col, k === "gpu_temp" ? Math.max(max, ...h) : max); }
       });
       flags.innerHTML = (gd.thr_thermal ? '<span class="badge b-bad">GPU: throttling termico</span>' : "") + (gd.thr_power ? '<span class="badge b-warn">GPU al limite di potenza</span>' : "");
     } catch (e) { /* ignora */ }

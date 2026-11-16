@@ -25,6 +25,7 @@ from . import verifica
 from . import fixpc
 from . import gamedetect, gameicons
 from . import backups, tweak_short
+from . import activity
 from . import __version__, pdh, settings, tray, updater
 from . import gpu as gpumod
 from .main import BACKUP, GAME_HINTS, NOT_GAMES, REPORTS, ROOT, TOOLS
@@ -391,6 +392,9 @@ def job_apply(job, ids, paths):
         job.msg("Punto di ripristino creato." if ok else "Punto di ripristino NON creato (%s). Ogni modifica ha "
                                                           "comunque il suo backup." % msg[-120:])
         STATE["restore_done"] = True
+        if ok:
+            activity.add("backup", "Backup creato prima di applicare %d modific%s" % (len(ids), "a" if len(ids) == 1 else "he"), "backups")
+            backups.forget_cache()
     results = []
     for tid in ids:
         t = tweaks.BY_ID[tid]
@@ -425,6 +429,9 @@ def job_apply(job, ids, paths):
     rb = [r["id"] for r in results if r["ok"] and tweaks.BY_ID[r["id"]].reboot]
     if rb:
         note_reboot(rb)
+    n = sum(1 for r in results if r["ok"])
+    if n:
+        activity.add("tweaks", "Applicat%s %d ottimizzazion%s" % ("a" if n == 1 else "e", n, "e" if n == 1 else "i"), "tweaks")
     return {"results": results, "reboot": bool(rb)}
 
 
@@ -438,6 +445,9 @@ def job_revert(job, ids):
         except Exception as e:
             results.append({"id": tid, "name": tweaks.BY_ID[tid].name, "ok": False, "msg": str(e)})
     refresh_statuses(None, ids)
+    n = sum(1 for r in results if r["ok"])
+    if n:
+        activity.add("tweaks", "Annullat%s %d modific%s di LagDoctor" % ("a" if n == 1 else "e", n, "a" if n == 1 else "he"), "backups")
     return {"results": results}
 
 
@@ -488,6 +498,7 @@ def job_fixpc(job, fid):
     def live(text):
         job.live = {"id": fid, "out": text}
     r = fixpc.run(fid, job=job, live=live)
+    activity.add("fixpc", "Fix PC: «%s», %s" % (fixpc.BY_ID[fid]["t"], "fatto" if r["ok"] else "non riuscito"), "fixpc")
     return r
 
 
@@ -559,6 +570,9 @@ def job_record(job, pid, seconds, label):
                    stutter_min=len(stutters) / max(stats["durata_s"] / 60, 0.01),
                    modifiche_attive=tweaks.applied_by_us(), **{k: round(v, 2) for k, v in stats.items()})
     summary["id"] = sessions.add(summary)
+    np = len([p for p in all_p if p.get("gravita", 0) >= 2])
+    activity.add("analisi", "Analisi di «%s»: %s" % (gname, ("%d problem%s trovat%s" % (np, "a" if np == 1 else "i", "o" if np == 1 else "i"))
+                                                    if np else "nessun problema importante"), "record")
     return {"session": summary, "problems": all_p, "info": info, "report": html_name, "factors": fac,
             "breakdown": res["summary"], "health": res["health"],
             "detail": sorted(res["detail"], key=lambda x: -x["ft"])[:40]}
@@ -676,6 +690,8 @@ class Handler(BaseHTTPRequestHandler):
             return catalog_json()
         if path == "/api/fixpc":
             return fixpc.catalog()
+        if path == "/api/home":
+            return home_json()
         if path == "/api/backups":
             try:
                 points, err = backups.restore_points(), None
@@ -773,13 +789,17 @@ class Handler(BaseHTTPRequestHandler):
                 ok, msg = backups.create()
                 if not ok:
                     raise RuntimeError("Windows non ha creato il backup: " + msg.strip()[-200:])
+                activity.add("backup", "Backup creato da te", "backups")
+                backups.forget_cache()
                 STATE["restore_done"] = True
                 return {"ok": True}
             job = start_job("backup", _mk)
         elif path in ("/api/backups/delete", "/api/backups/restore"):
             try:
                 fn = backups.delete if path.endswith("delete") else backups.restore
-                return 200, {"ok": True, "msg": fn(int(b.get("seq", -1)))}
+                msg = fn(int(b.get("seq", -1)))
+                backups.forget_cache()
+                return 200, {"ok": True, "msg": msg}
             except Exception as e:
                 return 400, {"error": str(e)}
         elif path == "/api/fixpc/run":
@@ -965,13 +985,15 @@ def _cpu_util_locked():
     q = _CPU["q"]
     if q is None:
         q = _CPU["q"] = pdh.Query({"util": r"\Processor Information(_Total)\% Processor Utility",
-                                   "time": r"\Processor Information(_Total)\% Processor Time"})
+                                   "time": r"\Processor Information(_Total)\% Processor Time",
+                                   "perf": r"\Processor Information(_Total)\% Processor Performance"})
         q.collect()
         time.sleep(0.25)
     ref = _cpu_times_util()
     if q.ok:
         v = q.collect()
         util, ptime = v.get("util"), v.get("time")
+        _CPU["perf"] = v.get("perf")
         base = ref if ref is not None else ptime
         if isinstance(util, (int, float)) and util >= 0:
             # con il turbo la "utilita'" puo' superare il tempo di CPU (frequenza piu' alta della base), ma non
@@ -987,6 +1009,41 @@ def _cpu_util_locked():
     return ref
 
 
+def _windows_name():
+    try:
+        import winreg
+        k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion")
+        def v(n):
+            try:
+                return winreg.QueryValueEx(k, n)[0]
+            except OSError:
+                return None
+        name, ver, build = v("ProductName") or "Windows", v("DisplayVersion") or v("ReleaseId"), v("CurrentBuild")
+        if build and str(build).isdigit() and int(build) >= 22000:
+            name = name.replace("Windows 10", "Windows 11")  # Windows 11 scrive ancora "Windows 10" nel registro
+        return "%s %s" % (name, ver) if ver else name
+    except Exception:
+        return None
+
+
+def home_json():
+    """Dati in piu' per la Panoramica: attivita' recenti, ultimo backup, Windows e disco di sistema."""
+    out = {"activity": activity.recent(5), "windows": _windows_name(), "last_backup": None, "disk": None,
+           "n_games": None}
+    try:
+        pts = backups.restore_points(cached=True)
+        out["last_backup"] = pts[0]["time"] if pts else None
+    except Exception:
+        pass
+    try:
+        drv = os.environ.get("SystemDrive", "C:") + "\\" if os.name == "nt" else "/"
+        du = psutil.disk_usage(drv)
+        out["disk"] = {"drive": drv.rstrip("\\/") or "/", "total_gb": round(du.total / 1e9), "free_gb": round(du.free / 1e9)}
+    except Exception:
+        pass
+    return out
+
+
 def _sys_sensors():
     """CPU e RAM per la Panoramica."""
     vm = psutil.virtual_memory()
@@ -994,7 +1051,16 @@ def _sys_sensors():
         cpu = _cpu_util()
     except Exception:
         cpu = None
-    return {"cpu_util": cpu, "ram_used": (vm.total - vm.available) / 2**30, "ram_total": vm.total / 2**30,
+    ghz = None
+    try:
+        base = (psutil.cpu_freq() or None)
+        base = base.max or base.current if base else None
+        perf = _CPU.get("perf")
+        if base:
+            ghz = base * (perf / 100.0 if isinstance(perf, (int, float)) and perf > 0 else 1.0) / 1000.0
+    except Exception:
+        pass
+    return {"cpu_util": cpu, "cpu_ghz": ghz, "ram_used": (vm.total - vm.available) / 2**30, "ram_total": vm.total / 2**30,
             "ram_pct": vm.percent}
 
 

@@ -21,8 +21,19 @@ ConvertTo-Json -InputObject $r -Compress
 '''
 
 
-def restore_points():
-    """[{seq, time (ISO), note}], dal piu' recente. Solleva RuntimeError se Windows non risponde."""
+_CACHE = {"t": 0, "v": None}
+
+
+def forget_cache():
+    _CACHE["v"] = None
+
+
+def restore_points(cached=False):
+    """[{seq, time (ISO), note}], dal piu' recente. Solleva RuntimeError se Windows non risponde.
+    cached: per la Panoramica, riusa la lettura degli ultimi 10 minuti (leggere i punti di ripristino e' lento)."""
+    import time
+    if cached and _CACHE["v"] is not None and time.time() - _CACHE["t"] < 600:
+        return _CACHE["v"]
     code, out = tweaks.ps(PS_LIST, timeout=90)
     m = re.search(r"\[.*\]", out or "", re.S)
     if code != 0 or not m:
@@ -33,6 +44,8 @@ def restore_points():
         note = desc[len(PREFIX):].lstrip(" :-") or "creato da LagDoctor"
         items.append({"seq": int(p["seq"]), "time": p.get("time"), "note": note})
     items.sort(key=lambda i: i["time"] or "", reverse=True)
+    import time
+    _CACHE.update(t=time.time(), v=items)
     return items
 
 
