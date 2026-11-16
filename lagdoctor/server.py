@@ -1277,9 +1277,50 @@ def _window_closed(proc):
         threading.Thread(target=_tray_hint, daemon=True).start()
 
 
+WEBVIEW_DIR_MARK = "finestra-webview2"  # cartella dei dati della finestra nuova (window.py)
+
+
+def _webview_leftovers(names=("msedgewebview2.exe",), mark=WEBVIEW_DIR_MARK):
+    """Processi di WebView2 rimasti dalla finestra di prima (stessa cartella dei dati)."""
+    out = []
+    for p in psutil.process_iter(["name", "cmdline"]):
+        try:
+            if (p.info["name"] or "").lower() in names and mark in " ".join(p.info["cmdline"] or []).lower():
+                out.append(p)
+        except psutil.Error:
+            continue
+    return out
+
+
+def _wait_webview_leftovers(timeout=6.0, **kw):
+    """Se la finestra e' appena stata chiusa, WebView2 ci mette qualche secondo a chiudersi del tutto: aprirne una
+    nuova in quel momento la fa andare in crash dopo 3 secondi (0xC0000005, visto sul PC principale riaprendo
+    LagDoctor dall'icona subito dopo averlo chiuso). Aspetto che finisca; se resta appeso lo chiudo io.
+    Ritorna quanti processi erano rimasti."""
+    left = _webview_leftovers(**kw)
+    if not left:
+        return 0
+    n = len(left)
+    _gone, alive = psutil.wait_procs(left, timeout=timeout)
+    for p in alive:
+        try:
+            p.kill()
+        except psutil.Error:
+            pass
+    if alive:
+        psutil.wait_procs(alive, timeout=3)
+    log_error_text("Aspettata la chiusura di %d processi WebView2 della finestra di prima%s" % (
+        n, " (%d chiusi a forza)" % len(alive) if alive else ""))
+    return n
+
+
 def _open_webview(url, minimized=False):
     """Apre la finestra WebView2. Se entro 10 secondi si chiude con un errore, apre quella di Edge."""
     soft = _webview_failures() >= 1  # e' gia' andata in errore una volta: provo con la grafica in software
+    try:
+        _wait_webview_leftovers()
+    except Exception:
+        log_error()
     cmd = paths.gui_cmd("--finestra", url, *(["--ridotto"] if minimized else []), *(["--senza-gpu"] if soft else []))
     try:
         out = open(paths.data("finestra-console.txt"), "a", encoding="utf-8", errors="replace")
