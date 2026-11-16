@@ -1,3 +1,11 @@
+## LagDoctor 5.25.28
+
+- Panoramica rinnovata: in alto il punteggio con lo stato del PC, i pulsanti principali e la game mode (si accende
+  e si spegne da li'); i problemi da sistemare (i primi 3, con "Mostra tutti"); i sensori in tempo reale con il
+  grafico degli ultimi 60 secondi (CPU con la frequenza, scheda video con frequenza e consumo, temperatura, memoria);
+  "Il tuo PC" con disco di sistema e versione di Windows; "Attivita' recenti": partite con la game mode, backup,
+  modifiche, analisi dei giochi e Fix PC (clic per aprire la pagina giusta).
+
 ## LagDoctor 5.25.27
 
 - Finestra: corretto il crash che faceva comparire a caso la finestra di Edge con la barra scura. Succedeva
