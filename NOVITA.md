@@ -1,3 +1,11 @@
+## LagDoctor 5.25.25
+
+- Ottimizzazioni: sotto ogni voce solo una frase breve; "dettagli" apre una finestrella sopra la pagina con la
+  sintesi, la spiegazione e i possibili problemi. Testi nuovi per tutte le 154 voci (anche driver e overlay).
+- Nuova scheda Backups: i backup di LagDoctor (punti di ripristino di Windows) con Ripristina ed Elimina, il pulsante
+  per crearne uno subito, e le modifiche di LagDoctor attive con Annulla modifica / Annulla tutte.
+- Tolta la scheda Driver video: le sue voci sono gia' in Ottimizzazioni (Driver NVIDIA / Driver AMD).
+
 ## LagDoctor 5.25.24
 
 - Panoramica, corretto: su alcuni PC (es. mini PC Intel N95) l'utilizzo della CPU segnava 100% anche a riposo,
