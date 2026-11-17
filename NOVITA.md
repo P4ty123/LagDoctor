@@ -1,3 +1,14 @@
+## LagDoctor 5.25.30
+
+- Ottimizzazioni: ogni voce ha il nome della cosa, non dell'azione ("HPET forzato", "TRIM degli SSD", "HAGS",
+  "Core parking"; negli overlay solo "Steam", "NVIDIA", "Discord"...). Niente piu' parentesi nei nomi: il nome
+  tecnico (es. useplatformclock, LargeSystemCache) e' nei dettagli. Anche le categorie: Correzioni, Sicurezza,
+  App preinstallate.
+- Interruttore acceso = quella cosa e' attiva sul PC, per tutte le voci, overlay compresi. Le etichette dicono
+  "meglio accesa" / "meglio spenta" e "accesa/spenta da LagDoctor"; i filtri sono Applicate / Non applicate.
+- Stessi nomi anche in Applica, Annulla, Backups, Verifica completa e nei risultati di Analizza gioco; nella
+  Game mode le voci sono nomi ("Pausa di OneDrive", "Chiusura di Esplora risorse"...); in Fix PC tolte le parentesi.
+
 ## LagDoctor 5.25.29
 
 - Impostazioni: nuovo "Ritardo all'avvio": scegli quanto aspetta LagDoctor dopo l'accesso a Windows prima di
