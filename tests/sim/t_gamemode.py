@@ -143,7 +143,8 @@ e = w.engine
 assert e.active
 print("azioni:", *e.actions, sep="\n   ")
 assert game._prio == 0x80, game._prio
-assert [p.name() for p in PROCS if p.name() in ("Widgets.exe", "OneDrive.exe", "explorer.exe")] == []
+assert [p.name() for p in PROCS if p.name() in ("Widgets.exe", "explorer.exe")] == []
+assert [p.name() for p in PROCS if p.name() == "OneDrive.exe"] == ["OneDrive.exe"]  # OneDrive non si chiude piu' (5.25.32)
 chrome = [p for p in PROCS if p.name() == "chrome.exe"][0]
 discord = [p for p in PROCS if p.name() == "Discord.exe"][0]
 svc = [p for p in PROCS if p.name() == "svchost.exe"][0]
@@ -168,9 +169,9 @@ w.tick()
 assert not e.active and not os.path.exists(GM.JOURNAL)
 assert chrome._prio == 0x20 and late._prio == 0x20
 assert any("Start-Service" in c for c in CMDS) and any("Remove-NetQosPolicy" in c for c in CMDS)
-assert any("explorer.exe" in x[0] for x in LAUNCHED) and any(x[0] == __file__ for x in LAUNCHED)
+assert any("explorer.exe" in x[0] for x in LAUNCHED) and not any(x[0] == __file__ for x in LAUNCHED)
 assert "TIMER False" in CMDS
-print("gioco chiuso: priorita', servizi, QoS, Esplora risorse, OneDrive e timer ripristinati")
+print("gioco chiuso: priorita', servizi, QoS, Esplora risorse e timer ripristinati")
 
 # crash: diario rimasto su disco -> ripristino all'avvio
 json.dump({"since": 1, "games": ["x"], "services": ["WSearch"], "explorer": False, "restart": [],
