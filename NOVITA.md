@@ -1,3 +1,11 @@
+## LagDoctor 5.25.31
+
+- Nomi piu' chiari in Ottimizzazioni: "Frame preparati in anticipo", "Limite FPS per G-SYNC" / "per FreeSync",
+  "Nomi brevi dei file per programmi vecchi", "Kernel sempre in RAM", "Servizi di Windows raggruppati"
+  (il nome tecnico resta nei dettagli).
+- Tolte le scritte grigie superflue: sotto lo stato della game mode (Panoramica e pagina Game mode), in
+  Attivita' recenti quando e' vuota e la nota lunga in Analizza gioco (resta il link "Mostra tutti i programmi aperti").
+
 ## LagDoctor 5.25.30
 
 - Ottimizzazioni: ogni voce ha il nome della cosa, non dell'azione ("HPET forzato", "TRIM degli SSD", "HAGS",

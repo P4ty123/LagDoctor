@@ -289,7 +289,7 @@ function heroGmHtml(gm) {
   else if (!gm.running) { st = "warn"; t = "Non in esecuzione"; sub = "Apri la pagina Game mode per riavviarla"; }
   else if (gm.active) { st = "on"; t = esc((gm.games || []).join(", ")); sub = "Attiva: il PC lavora per il gioco"; }
   else { st = "ready"; t = "Pronta"; sub = `Si attiva da sola quando apri uno dei tuoi ${gm.n_games} giochi`; }
-  return `<div class="hm-gm ${st}"><div class="hm-gmh" data-go="gamemode"><span class="dot"></span>Game mode</div><b data-go="gamemode">${t}</b><small>${sub}</small>
+  return `<div class="hm-gm ${st}"><div class="hm-gmh" data-go="gamemode"><span class="dot"></span>Game mode</div><b data-go="gamemode">${t}</b>
     ${gm.active ? '<a class="hm-ver" id="home-gm-ver">Verifica ottimizzazioni</a>' : ""}
     <button class="hm-pw" id="home-gm-pw" title="${gm.enabled ? "Spegni la game mode" : "Accendi la game mode"}">${hsv("power")}</button></div>`;
 }
@@ -355,7 +355,7 @@ async function home() {
 }
 function actHtml(list) {
   if (!list) return '<div class="mut" style="padding:8px 0">...</div>';
-  if (!list.length) return '<div class="mut" style="padding:8px 0">Ancora niente: qui compariranno partite con la game mode, backup, modifiche e analisi.</div>';
+  if (!list.length) return "";
   return list.map((a, i) => {
     const ic = ACT_IC[a.kind] || ["check", "#94a3b8"];
     const txt = esc(a.text).replace(/«(.*?)»/g, "<b>$1</b>");
@@ -1243,7 +1243,7 @@ async function gamemodePage(scanAgain) {
   main().innerHTML = `<h1>Game mode</h1><p class="sub">Quando apri un gioco, il PC lavora solo per lui. Quando lo chiudi, tutto torna esattamente com'era.</p>
     <div class="gm-hero ${state}" id="gm-status">
       <button class="gm-power" id="gm-power" title="${c.enabled ? "Spegni la game mode" : "Accendi la game mode"}">${icoSvg(GM_PW)}</button>
-      <div class="gm-state"><div class="gm-k">${k}</div><div class="gm-t">${title}</div><div class="gm-s">${sub}</div>
+      <div class="gm-state"><div class="gm-k">${k}</div><div class="gm-t">${title}</div>
         <div class="gm-links">${st.active ? '<a id="gm-ver-btn">Verifica ottimizzazioni</a>' : ""}${(st.actions || []).length ? `<a id="gm-acts">Cosa ha fatto ${st.active ? "ora" : "l'ultima volta"}</a>` : ""}
           ${c.enabled && !st.active ? `<span>${st.autostart ? "Parte da sola con Windows" : "Avvio con Windows non attivo"}</span>` : ""}</div></div>
       <div class="gm-nums"><div><b>${nOn}</b><small>giochi seguiti</small></div><div><b>${optOn}</b><small>azioni attive</small></div></div>
@@ -1390,8 +1390,7 @@ async function record() {
       <div id="procs">${r.items.length ? `<div class="ag-list">${r.items.map(row).join("")}</div>`
         : `<div class="ag-empty">${icoSvg(GM_GROUPS[0][2])}<b>Nessun gioco aperto</b><span>Apri il gioco, entra in partita e premi Aggiorna.</span></div>`}
       ${S.recAll ? `<div class="gm-sec" style="margin-top:22px"><h2 style="font-size:15px">Altri programmi aperti</h2></div>${(r.others || []).length ? `<div class="ag-list">${r.others.map(row).join("")}</div>` : '<p class="mut">Nessun altro programma grande aperto.</p>'}` : ""}</div>
-      <p class="ag-note">Vengono mostrati solo i giochi: quelli installati sul PC (Steam, Epic, Xbox, Riot, EA, Ubisoft, Battle.net, GOG, Minecraft e quelli aggiunti nella game mode), quelli nelle cartelle dei giochi e i programmi a schermo intero che usano la scheda video per disegnare. Browser, Discord e gli altri programmi non compaiono.
-        <a id="rec-all">${S.recAll ? "Mostra solo i giochi" : "Il tuo gioco non c'e'? Mostra tutti i programmi aperti"}</a></p>
+      <p class="ag-note"><a id="rec-all">${S.recAll ? "Mostra solo i giochi" : "Il tuo gioco non c'e'? Mostra tutti i programmi aperti"}</a></p>
     </div><div>
       <div class="gm-sec"><h2>Durata</h2></div>
       <div class="ag-durs" id="durs">${DURS.map((v) => `<a data-d="${v}" class="${v === dur ? "on" : ""}">${v / 60} min</a>`).join("")}</div>
