@@ -25,7 +25,7 @@ jobs:
 
   windows:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -39,6 +39,10 @@ jobs:
           Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, OSLanguage | Format-List
           powercfg /getactivescheme
       - name: Collaudo su Windows vero (applica / verifica / annulla ogni voce)
+        # le prove lunghe (SFC, DISM ScanHealth, chkdsk, defrag: 10-30 minuti, a volte di piu') solo fuori dalla
+        # pubblicazione (ramo test/collaudo o avvio a mano): prima di pubblicare bastano le prove veloci
+        env:
+          COLLAUDO_LUNGO: ${{ github.ref != 'refs/heads/main' }}
         run: python tests/windows/collaudo_windows.py collaudo
       - name: Risultati
         if: always()

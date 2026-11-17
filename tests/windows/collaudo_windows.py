@@ -370,7 +370,12 @@ def fixpc_veri():
         except Exception as e:
             esito("Fix PC", f["t"], False, "%s: %s" % (type(e).__name__, str(e)[:200]))
             traceback.print_exc()
-    # comandi con barra di avanzamento (non riparano niente): percentuale fluida ed esito chiaro
+    # comandi con barra di avanzamento (non riparano niente): percentuale fluida ed esito chiaro.
+    # Durano 10-30 minuti: si fanno sul ramo test/collaudo, non a ogni pubblicazione
+    if os.environ.get("COLLAUDO_LUNGO", "true").lower() != "true":
+        print("n/a      Fix PC                 SFC, DISM, chkdsk e defrag: prove lunghe solo sul ramo test/collaudo")
+        RIGHE.append("n/a      Fix PC                 prove lunghe (SFC, DISM, chkdsk, defrag) solo sul ramo test/collaudo")
+        return
     prove = [("SFC (sfc /verifyonly)", "sfc /verifyonly", "sfc", 15, "sfc"),
              ("DISM ScanHealth", "DISM /Online /Cleanup-Image /ScanHealth", "dism_check", 5, "a posto"),
              ("Controllo disco (chkdsk C: /scan)", "chkdsk C: /scan", "chk_scan", 3, "non ha errori"),
