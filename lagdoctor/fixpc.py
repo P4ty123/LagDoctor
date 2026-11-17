@@ -122,13 +122,13 @@ CATS = [
         fix("Riparazione completa di Windows", "Schermate blu, errori strani, programmi di sistema che non si aprono. Fa tutto in ordine: DISM e poi SFC.",
             [cmd("DISM /Online /Cleanup-Image /RestoreHealth"), cmd("sfc /scannow", enc="utf-16-le", soft=True)], d="15-30 minuti", res="full",
             best=True, kw="schermata blu errori dism sfc riparare corrotto"),
-        fix("Controllo rapido dell'immagine (DISM)", "Verifica se Windows risulta gia' segnato come danneggiato.",
+        fix("Controllo rapido DISM", "Verifica se Windows risulta gia' segnato come danneggiato.",
             [cmd("DISM /Online /Cleanup-Image /CheckHealth", soft=True)], ro=True, ci=True, res="dism_check", kw="dism corrotto"),
-        fix("Controllo approfondito dell'immagine (DISM)", "Cerca danni nei file di Windows senza riparare.",
+        fix("Controllo approfondito DISM", "Cerca danni nei file di Windows senza riparare.",
             [cmd("DISM /Online /Cleanup-Image /ScanHealth", soft=True)], ro=True, res="dism_check", d="5-10 minuti", kw="dism corrotto"),
-        fix("Ripara l'immagine di Windows (DISM)", "Scarica da Windows Update i file di sistema danneggiati e li sostituisce.",
+        fix("Riparazione dell'immagine di Windows con DISM", "Scarica da Windows Update i file di sistema danneggiati e li sostituisce.",
             [cmd("DISM /Online /Cleanup-Image /RestoreHealth", soft=True)], d="10-20 minuti", res="dism_restore", kw="dism riparare"),
-        fix("Controllo file di sistema (SFC)", "Ripara i file di sistema usando la copia locale.",
+        fix("Controllo dei file di sistema SFC", "Ripara i file di sistema usando la copia locale.",
             [cmd("sfc /scannow", enc="utf-16-le", soft=True)], d="5-15 minuti", res="sfc", kw="sfc riparare"),
     ]),
     ("wu", "Windows Update", [
@@ -189,7 +189,7 @@ CATS = [
             [ps("Get-AppxPackage -AllUsers | Where-Object { $_.InstallLocation -and -not $_.IsFramework } | " + APPX_REG)],
             w="Ci mette qualche minuto e alcune app vengono saltate: e' normale.", d="3-10 minuti",
             kw="app calcolatrice foto impostazioni"),
-        fix("Ripara Gaming Services (Xbox)", "Giochi del Game Pass che non si installano o non partono.",
+        fix("Ripara Gaming Services di Xbox", "Giochi del Game Pass che non si installano o non partono.",
             [ps("Get-AppxPackage -AllUsers *GamingServices* | Remove-AppxPackage -AllUsers", soft=True),
              ps("Start-Process 'ms-windows-store://pdp/?productid=9MWPM2CQNLHN'")],
             w="Disinstalla Gaming Services e apre lo Store per reinstallarlo (premi Installa): i giochi restano.",
@@ -409,8 +409,8 @@ def _sfc_cbs(since):
     if not sr:
         return None
     if any("Cannot repair member file" in l for l in sr):
-        return False, ("SFC ha trovato file danneggiati ma non e' riuscito a ripararli tutti: esegui \"Ripara l'immagine "
-                       "di Windows (DISM)\", riavvia e poi esegui di nuovo SFC.")
+        return False, ("SFC ha trovato file danneggiati ma non e' riuscito a ripararli tutti: esegui \"Riparazione dell'immagine "
+                       "di Windows con DISM\", riavvia e poi esegui di nuovo SFC.")
     if any("Repaired file" in l or "Repairing corrupted file" in l for l in sr):
         return True, "SFC ha trovato file danneggiati e li ha riparati tutti. Riavvia il PC per completare."
     bad = any(x in l for l in sr for x in ("Cannot verify", "do not match", "orrupt", "violation"))
@@ -427,8 +427,8 @@ def _sfc(out, since=None):
     if _has(out, "li ha ripristinati", "successfully repaired"):
         return True, "SFC ha trovato file danneggiati e li ha riparati tutti. Riavvia il PC per completare."
     if _has(out, "correggerne alcuni", "unable to fix some"):
-        return False, ("SFC ha trovato file danneggiati ma non e' riuscito a ripararli tutti: esegui \"Ripara l'immagine "
-                       "di Windows (DISM)\", riavvia e poi esegui di nuovo SFC.")
+        return False, ("SFC ha trovato file danneggiati ma non e' riuscito a ripararli tutti: esegui \"Riparazione dell'immagine "
+                       "di Windows con DISM\", riavvia e poi esegui di nuovo SFC.")
     if _has(out, "found integrity violations", "rilevato violazioni di integrit", "rilevato delle violazioni"):
         return False, ("SFC ha trovato file di sistema danneggiati: esegui \"Riparazione completa di Windows\" "
                        "per ripararli (DISM e poi SFC).")
@@ -449,7 +449,7 @@ def _dism(out, code, restore):
     if _has(out, "not repairable", "non e' ripristinabile", "non è ripristinabile", "non riparabile"):
         return False, "DISM dice che l'immagine di Windows e' danneggiata e NON si puo' riparare: serve reinstallare Windows mantenendo i file."
     if _has(out, "repairable", "ripristinabile", "riparabile"):
-        return False, "DISM ha trovato file di Windows danneggiati che si possono riparare: esegui \"Ripara l'immagine di Windows (DISM)\"."
+        return False, "DISM ha trovato file di Windows danneggiati che si possono riparare: esegui \"Riparazione dell'immagine di Windows con DISM\"."
     return True, "DISM non ha trovato nessun danneggiamento: l'immagine di Windows e' a posto."
 
 

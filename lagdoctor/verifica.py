@@ -135,7 +135,8 @@ def check_tweaks(statuses, vendor):
     for t in T.for_vendor(vendor):
         st = statuses.get(t.id) if t.id in statuses else None
         code, msg = verdict(t, st, state.get(t.id))
-        rows.append({"group": t.cat, "name": t.name, "id": t.id, "res": code, "msg": msg,
+        from . import tweak_names
+        rows.append({"group": t.cat, "name": tweak_names.label(t), "id": t.id, "res": code, "msg": msg,
                      "detail": detail(t) if code in ("ok", "ko", "reboot", "unk") else []})
     return rows
 

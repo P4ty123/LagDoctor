@@ -84,7 +84,12 @@ def changes():
         if tid.startswith("_") or not isinstance(item, dict):
             continue
         t = tweaks.BY_ID.get(tid)
-        out.append({"id": tid, "name": t.name if t else item.get("nome") or tid, "cat": t.cat if t else "",
+        from . import tweak_names
+        nm = tweak_names.get(tid) or {}
+        name = nm.get("label") or (t.name if t else item.get("nome") or tid)
+        if nm:
+            name += " · " + ("accesa" if nm.get("pol", 1) > 0 else "spenta") + " da LagDoctor"
+        out.append({"id": tid, "name": name, "cat": t.cat if t else "",
                     "time": item.get("data"), "known": bool(t)})
     out.sort(key=lambda c: c["time"] or "", reverse=True)
     return out

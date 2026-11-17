@@ -659,3 +659,4 @@ nav a i svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.
 .sd-row{display:flex;align-items:center;gap:14px;margin-top:8px}
 .sd-row input[type=range]{flex:1;max-width:320px;accent-color:var(--a2);cursor:pointer}
 .sd-row b{min-width:90px;font-size:14px}
+.doc3 .tech{color:var(--mut);font-size:12.5px;margin-top:3px}

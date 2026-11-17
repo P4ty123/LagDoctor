@@ -24,7 +24,7 @@ from . import autostart
 from . import verifica
 from . import fixpc
 from . import gamedetect, gameicons
-from . import backups, tweak_short
+from . import backups, tweak_short, tweak_names
 from . import activity
 from . import __version__, pdh, settings, tray, updater
 from . import gpu as gpumod
@@ -134,7 +134,7 @@ def reboot_pending():
         except OSError:
             pass
         return []
-    return [tweaks.BY_ID[i].name for i in d.get("ids", []) if i in tweaks.BY_ID]
+    return [tweak_names.label(tweaks.BY_ID[i]) for i in d.get("ids", []) if i in tweaks.BY_ID]
 
 
 def vendor():
@@ -158,10 +158,22 @@ def tweak_json(t, st, applied, sysinfo, ignored=frozenset()):
             "harm_if_off": t.harm_if_off, "group": t.group, "source": t.source,
             "recommended": t.recommended(sysinfo), "status": st.get(t.id), "applied": t.id in applied,
             "needs_path": isinstance(t, tweaks.DefenderExclusionTweak), "doc": tweak_docs.get(t.id),
-            "short": (tweak_short.get(t.id) or {}).get("short"), "sum": (tweak_short.get(t.id) or {}).get("sum"),
+            "short": _short_of(t), "sum": (tweak_short.get(t.id) or {}).get("sum"),
+            "label": (tweak_names.get(t.id) or {}).get("label") or t.name, "pol": (tweak_names.get(t.id) or {}).get("pol", 1),
+            "tech": (tweak_names.get(t.id) or {}).get("tech"),
             "note": getattr(t, "note", None), "manual": bool(getattr(t, "manual", False)),
             "how": getattr(t, "how", None), "how_ld": getattr(t, "how_ld", None),
             "closes": getattr(t, "closes", None), "running": t.running() if hasattr(t, "running") else []}
+
+
+def _short_of(t):
+    """frase sotto il nome: descrive la cosa (per le voci che la spengono) o cosa fa (per quelle che la accendono)."""
+    nm = tweak_names.get(t.id) or {}
+    if nm.get("short"):
+        return nm["short"]
+    if nm.get("pol", 1) < 0:
+        return t.desc
+    return (tweak_short.get(t.id) or {}).get("short")
 
 
 def catalog_json():
@@ -402,10 +414,11 @@ def job_apply(job, ids, paths):
             t.paths, t.path = list(paths), None
         try:
             r = tweaks.apply_one(tid)
-            results.append({"id": tid, "name": t.name, "ok": True, "msg": r})
+            results.append({"id": tid, "name": tweak_names.label(t), "ok": True,
+                            "msg": r.replace("applicata", tweak_names.verbo(t)) if isinstance(r, str) else r})
         except Exception as e:
-            results.append({"id": tid, "name": t.name, "ok": False, "msg": str(e)})
-        job.msg("%s: %s" % (t.name, results[-1]["msg"]))
+            results.append({"id": tid, "name": tweak_names.label(t), "ok": False, "msg": str(e)})
+        job.msg("%s: %s" % (tweak_names.label(t), results[-1]["msg"]))
     refresh_statuses(None, [t.id for t in tweaks.CATALOG if t.group in {tweaks.BY_ID[i].group for i in ids}
                             and t.group] + list(ids))
     # controllo vero dopo l'applicazione: "applicata" solo se Windows la mostra davvero attiva
@@ -439,11 +452,11 @@ def job_revert(job, ids):
     results = []
     for tid in ids:
         try:
-            results.append({"id": tid, "name": tweaks.BY_ID[tid].name, "ok": True, "msg": tweaks.revert_one(tid)})
+            results.append({"id": tid, "name": tweak_names.label(tweaks.BY_ID[tid]), "ok": True, "msg": tweaks.revert_one(tid)})
             if tweaks.BY_ID[tid].reboot:
                 note_reboot([tid])
         except Exception as e:
-            results.append({"id": tid, "name": tweaks.BY_ID[tid].name, "ok": False, "msg": str(e)})
+            results.append({"id": tid, "name": tweak_names.label(tweaks.BY_ID[tid]), "ok": False, "msg": str(e)})
     refresh_statuses(None, ids)
     n = sum(1 for r in results if r["ok"])
     if n:
@@ -743,7 +756,7 @@ class Handler(BaseHTTPRequestHandler):
             b = sessions.get(int(qs["b"][0]))
             rows, verdict, why = sessions.compare(a, b)
             da, db = set(a.get("modifiche_attive", [])), set(b.get("modifiche_attive", []))
-            nm = lambda i: tweaks.BY_ID[i].name if i in tweaks.BY_ID else i
+            nm = lambda i: tweak_names.label(tweaks.BY_ID[i]) if i in tweaks.BY_ID else i
             return {"a": a, "b": b, "verdict": verdict, "why": why,
                     "rows": [{"label": r[0], "a": r[1], "b": r[2], "pct": r[3], "better": r[4]} for r in rows],
                     "added": [nm(i) for i in db - da], "removed": [nm(i) for i in da - db],

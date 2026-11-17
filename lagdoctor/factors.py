@@ -122,13 +122,15 @@ def analyze(problems, stutter_per_min, statuses, applied, vendor, sysinfo, cappe
             if _harmful(t, kind, st, tid in applied):
                 if t.group and any(w.get("group") == t.group for w in worse):
                     continue  # stesso problema gia' elencato (mito + sua correzione)
-                label = ("ATTIVO: " + t.name) if kind in ("myth", "on_bad") else t.desc
-                worse.append({"id": tid, "name": t.name, "label": label, "group": t.group,
+                from . import tweak_names
+                label = ("ATTIVO: " + tweak_names.label(t)) if kind in ("myth", "on_bad") else t.desc
+                worse.append({"id": tid, "name": tweak_names.label(t), "label": label, "group": t.group,
                               "why": d.get("problemi") if kind in ("myth", "on_bad") else (d.get("perche") or t.desc),
                               "myth": kind == "myth", "kind": kind, "undo": kind == "on_bad" and tid in applied})
             elif kind == "help" and st is False and t.efficacy in ("alta", "media") and \
                     not (capped and tid in ("nv_fps_cap", "amd_fps_cap")):  # il limite FPS c'e' gia' nel gioco
-                help_.append({"id": tid, "name": t.name, "why": d.get("perche") or t.desc, "risk": T.RISK[t.risk]})
+                from . import tweak_names
+                help_.append({"id": tid, "name": tweak_names.label(t), "why": d.get("perche") or t.desc, "risk": T.RISK[t.risk]})
         shown.update(x["id"] for x in worse + help_)
         shown.update("g:" + T.BY_ID[x["id"]].group for x in worse + help_ if T.BY_ID[x["id"]].group)
         if worse or help_:

@@ -484,11 +484,11 @@ function notActive() {
   return twsActive().filter((t) => !fx.has(t.id) && !isOn(t) && t.kind !== "fix" && t.kind !== "myth" && !t.manual && !(t.group && groups.has(t.group)));
 }
 function statusBadge(t) {
-  if (t.applied) return t.kind === "myth" ? '<span class="badge b-bad">attivata da LagDoctor</span>' : '<span class="badge b-acc">applicata da LagDoctor</span>';
+  if (t.applied) return t.kind === "myth" ? '<span class="badge b-bad">attivata da LagDoctor</span>' : `<span class="badge b-acc">${(t.pol || 1) > 0 ? "accesa" : "spenta"} da LagDoctor</span>`;
   if (S.booting && t.status == null) return '<span class="badge">in lettura...</span>';
   if (t.kind === "myth") return t.status === true ? '<span class="badge b-bad">ATTIVA: da disattivare</span>' : t.status === false ? '<span class="badge b-ok">disattivata</span>' : '<span class="badge">non verificabile</span>';
-  if (t.status === true) return t.note ? `<span class="badge b-ok" title="${esc(t.note)}">gia' attiva (altro programma)</span>` : '<span class="badge b-ok">gia\' attiva</span>';
-  if (t.status === false) return t.kind === "fix" || t.harm_if_off ? '<span class="badge b-bad">da correggere</span>' : '<span class="badge">non attiva</span>';
+  if (t.status === true) { const w = (t.pol || 1) > 0 ? "gia' accesa" : "gia' spenta"; return t.note ? `<span class="badge b-ok" title="${esc(t.note)}">${w} (altro programma)</span>` : `<span class="badge b-ok">${w}</span>`; }
+  if (t.status === false) return t.kind === "fix" || t.harm_if_off ? '<span class="badge b-bad">da correggere</span>' : "";
   if (S.booting && t.status == null) return '<span class="badge">in lettura...</span>';
   if (t.note) return '<span class="badge">' + esc(t.note) + '</span>';
   return '<span class="badge">non verificabile</span>';
@@ -516,6 +516,9 @@ const CAT_IC = {
   "Driver AMD": ["#ff5c5c", '<rect x="2" y="6" width="20" height="11" rx="2"/><circle cx="9" cy="11.5" r="2.8"/><path d="M15 9.5h4M15 13.5h4M5 17v2"/>'],
 };
 const catIcon = (k) => { const i = CAT_IC[k]; return i ? `<span class="ci" style="color:${i[0]}"><svg viewBox="0 0 24 24">${i[1]}</svg></span>` : ""; };
+/* nomi delle categorie senza le parentesi (la spiegazione e' nelle voci) */
+const CAT_NAMES = { "Correzioni (impostazioni che tolgono prestazioni)": "Correzioni", "Sicurezza (PERICOLOSE)": "Sicurezza", "Debloat (app preinstallate)": "App preinstallate" };
+const catName = (c) => CAT_NAMES[c] || c;
 async function tweaksPage() {
   main().innerHTML = '<div class="loading"><div class="spinner"></div><p>Carico le impostazioni...</p></div>';
   await loadCatalog();
@@ -529,7 +532,7 @@ async function tweaksPage() {
   main().innerHTML = `
     <div class="row opt-head"><div><h1 style="margin-bottom:4px">Ottimizzazioni</h1><p class="sub" id="opt-sub" style="margin:0"></p></div><span class="grow"></span>
       <div class="seg" id="filters">
-        <a data-f="fix">Da correggere</a><a data-f="all">Tutte</a><a data-f="rec">Consigliate</a><a data-f="off">Non attive</a><a data-f="on">Attive</a><a data-f="ign">Ignorate</a>
+        <a data-f="fix">Da correggere</a><a data-f="all">Tutte</a><a data-f="rec">Consigliate</a><a data-f="off">Non applicate</a><a data-f="on">Applicate</a><a data-f="ign">Ignorate</a>
       </div></div>
     <div class="opt-wrap"><div class="cats" id="cats"></div>
       <div class="panel">
@@ -575,7 +578,7 @@ function filtered() {
     if (S.filter === "rec" && !(t.recommended && !isOn(t)) && !fx.has(t.id)) return false;
     if (S.filter === "on" && !(isOn(t) && t.kind !== "myth")) return false;
     if (S.filter === "myth" && t.kind !== "myth") return false;
-    if (q && !(t.name + " " + t.desc).toLowerCase().includes(q)) return false;
+    if (q && !(t.name + " " + (t.label || "") + " " + (t.tech || "") + " " + t.desc).toLowerCase().includes(q)) return false;
     return true;
   });
 }
@@ -589,7 +592,7 @@ function docModal(t) {
   const myth = t.kind === "myth";
   const body = [d.cosa, d.perche].filter((x) => x && x !== t.sum).join(" ");
   const prob = d.problemi && !/^nessuno/i.test(d.problemi.trim()) ? d.problemi : "";
-  const m = modal(`<div class="hd"><h2>${esc(t.name)}</h2><button class="x" id="m-close" title="Chiudi">&times;</button></div>
+  const m = modal(`<div class="hd"><div style="flex:1"><h2>${esc(t.label || t.name)}</h2>${t.tech ? `<div class="tech">${esc(t.tech)}</div>` : ""}</div><button class="x" id="m-close" title="Chiudi">&times;</button></div>
     <p class="sum">${esc(t.sum || t.desc || "")}</p>
     ${body ? `<p>${esc(body)}</p>` : ""}
     ${t.how_ld ? `<p><b>Se lo spegni da LagDoctor:</b> ${esc(t.how_ld)}</p>` : ""}
@@ -650,25 +653,25 @@ function stateHtml(t) {
     if (t.status === true) return '<span class="badge b-ok">spento</span>';
     return '<span class="badge" title="LagDoctor non riesce a leggere questa impostazione">da controllare</span>';
   }
-  if (S.sel.has(t.id)) return '<span class="badge b-acc">da applicare</span>';
+  if (S.sel.has(t.id)) return `<span class="badge b-acc">${(t.pol || 1) > 0 ? "da accendere" : "da spegnere"}</span>`;
   if (t.applied || t.kind === "myth" || t.status === true) return statusBadge(t);
   if (S.booting && t.status == null) return '<span class="badge">in lettura...</span>';
   if (t.status === false && (t.kind === "fix" || t.harm_if_off) && !t.ignored) return '<span class="badge b-bad">da correggere</span>';
-  if (t.recommended === true && !t.ignored) return '<span class="badge b-acc">consigliata</span>';
+  if (t.recommended === true && !t.ignored) return `<span class="badge b-acc">${(t.pol || 1) > 0 ? "meglio accesa" : "meglio spenta"}</span>`;
   if (t.status == null) return statusBadge(t);
   return "";
 }
 function switchHtml(t) {
   if (t.manual) return `<button class="ghost sm how-btn" data-how="${t.id}" title="Si spegne dal programma: ti dico dove">Come spegnerlo</button>`;
   if (t.kind === "overlay") return ovSwitchHtml(t);
-  const on = isOn(t) || S.sel.has(t.id);
+  const applied = isOn(t) || S.sel.has(t.id), on = (t.pol || 1) > 0 ? applied : !applied;  /* acceso = la cosa e' attiva sul PC */
   let tip = "", dis = false;
   if (t.ignored) { dis = true; tip = "Voce ignorata"; }
   else if (t.applied) tip = t.kind === "myth" ? "Disattiva" : "Annulla la modifica di LagDoctor";
   else if (t.kind === "myth" && t.status === true) tip = "Disattiva";
-  else if (isOn(t)) { dis = true; tip = "Gia' attiva (impostata da Windows o da un altro programma)"; }
+  else if (isOn(t)) { dis = true; tip = "Gia' cosi' (impostata da Windows o da un altro programma)"; }
   else if (t.kind === "overlay") tip = S.sel.has(t.id) ? "Verra' spento quando premi Applica" : "Accendi per spegnere questo overlay (poi premi Applica)";
-  else tip = S.sel.has(t.id) ? "Selezionata: premi Applica in basso" : "Seleziona per applicarla";
+  else tip = S.sel.has(t.id) ? "Cambiata: premi Applica in basso" : ((t.pol || 1) > 0 ? "Accendi e premi Applica" : "Spegni e premi Applica");
   return `<label class="switch${S.sel.has(t.id) ? " pend" : ""}" title="${tip}"><input type="checkbox" data-sw="${t.id}" ${on ? "checked" : ""} ${dis ? "disabled" : ""}><span></span></label>`;
 }
 /* overlay: l'interruttore mostra l'OVERLAY (acceso = l'overlay e' acceso). Spegnendolo lo si seleziona per Applica. */
@@ -677,18 +680,18 @@ const ovOn = (t) => !t.applied && (!isOn(t) || (t.running && t.running.length > 
 /* interruttore ACCESO = overlay SPENTO (come le altre ottimizzazioni: acceso = ottimizzazione attiva),
    chiunque l'abbia spento (LagDoctor o tu dal programma). Overlay acceso = interruttore spento, sempre libero. */
 function ovSwitchHtml(t) {
-  const pend = S.sel.has(t.id), on = !ovOn(t) || pend;
+  const pend = S.sel.has(t.id), on = ovOn(t) && !pend;  /* acceso = l'overlay e' attivo */
   let tip, dis = false;
   if (t.ignored) { dis = true; tip = "Voce ignorata"; }
-  else if (pend) tip = "Verra' spento quando premi Applica (spegni di nuovo l'interruttore per annullare)";
-  else if (t.applied) tip = "Overlay spento da LagDoctor (resta spento): spegni l'interruttore per riaccenderlo";
+  else if (pend) tip = "Verra' spento quando premi Applica (riaccendi l'interruttore per annullare)";
+  else if (t.applied) tip = "Overlay spento da LagDoctor (resta spento): accendi l'interruttore per riaccenderlo";
   else if (!ovOn(t)) tip = "Overlay spento dal suo programma";
-  else tip = "Overlay acceso: accendi l'interruttore e premi Applica per spegnerlo";
+  else tip = "Overlay acceso: spegni l'interruttore e premi Applica per spegnerlo";
   return `<label class="switch${pend ? " pend" : ""}" title="${tip}"><input type="checkbox" data-sw="${t.id}" ${on ? "checked" : ""} ${dis ? "disabled" : ""}><span></span></label>`;
 }
 function rowHtml(t) {
   return `<div class="tw2 ${S.sel.has(t.id) ? "sel" : ""}" data-id="${t.id}">
-    <div class="tx name"><b>${esc(t.name)}</b><div>${esc(t.short || t.desc || (t.doc && t.doc.cosa) || "")} ${actionHtml(t)}</div></div>
+    <div class="tx name"><b>${esc(t.label || t.name)}</b><div>${esc(t.short || t.desc || (t.doc && t.doc.cosa) || "")} ${actionHtml(t)}</div></div>
     <div class="right"><span class="stc">${stateHtml(t)}</span>${dotsHtml(t)}<span class="risk ${RISK_CLS[t.risk] || "m"}">${esc(t.risk_label)}</span>${switchHtml(t)}</div>
   </div>`;
 }
@@ -699,7 +702,7 @@ function renderTweaks() {
   const order = [...new Set(all.map((t) => t.cat))];
   if (S.twCat && !order.includes(S.twCat)) S.twCat = "";
   const nOn = act.filter((t) => isOn(t) && t.kind !== "myth").length, nTot = act.filter((t) => t.kind !== "myth" || isOn(t)).length;
-  $("#opt-sub").textContent = `${nOn} attive su ${nTot}` + (fx.size ? ` · ${fx.size} da correggere` : "");
+  $("#opt-sub").textContent = `${nOn} applicate su ${nTot}` + (fx.size ? ` · ${fx.size} da correggere` : "");
   const counts = { fix: fx.size, ign: ignoredList().length };
   $$("#filters a").forEach((c) => { const n = counts[c.dataset.f]; c.innerHTML = c.textContent.replace(/ \d+$/, "") + (n ? ` <small>${n}</small>` : ""); });
   /* categorie a sinistra */
@@ -714,12 +717,12 @@ function renderTweaks() {
     return `<div class="cat ${S.twCat === key ? "on" : ""} ${n ? "" : "empty"}" data-cat="${esc(key)}"><div class="r">${warn ? '<span class="warn" title="ci sono voci da correggere"></span>' : ""}${catIcon(key)}<b>${esc(label)}</b><span class="c">${cnt}</span></div>
       <div class="p"><i style="width:${pct}%"></i></div></div>`;
   };
-  $("#cats").innerHTML = catRow("", "Tutte le categorie", act) + order.map((c) => catRow(c, c, act.filter((t) => t.cat === c))).join("");
+  $("#cats").innerHTML = catRow("", "Tutte le categorie", act) + order.map((c) => catRow(c, catName(c), act.filter((t) => t.cat === c))).join("");
   $$("#cats .cat").forEach((el) => el.addEventListener("click", () => { if (S.twCat === el.dataset.cat) return; if (el.dataset.cat === OV_CAT && S.twCat !== OV_CAT) S.ovLoaded = false; swapTweaks(() => { S.twCat = el.dataset.cat; }); }));
   /* pannello a destra */
   const list = visible();
   const fname = { fix: "da correggere", all: "", rec: "consigliate", off: "non attive", on: "attive", ign: "ignorate", myth: "non affidabili" }[S.filter] || "";
-  $("#pan-t").textContent = S.twCat || "Tutte le categorie";
+  $("#pan-t").textContent = S.twCat ? catName(S.twCat) : "Tutte le categorie";
   const scope = act.filter((t) => !S.twCat || t.cat === S.twCat);
   const sTot = scope.filter((t) => t.kind !== "myth" || isOn(t)).length;
   const allMyth = scope.length && scope.every((t) => t.kind === "myth");
@@ -729,7 +732,7 @@ function renderTweaks() {
     const off = ovs.filter((t) => t.applied || (t.status === true && !(t.running && t.running.length))).length, unk = ovs.length - acc - off;
     $("#pan-s").textContent = `Overlay installati: ${acc} ${acc === 1 ? "acceso" : "accesi"}, ${off} ${off === 1 ? "spento" : "spenti"}` +
       (unk ? `, ${unk} da controllare` : "") + (fname ? ` · ${list.length} ${fname}` : "");
-  } else $("#pan-s").textContent = (allMyth ? `${scope.length} voci · ${scope.filter(isOn).length} attive sul tuo PC` : `${scope.filter((t) => isOn(t) && t.kind !== "myth").length} attive su ${sTot}`) + (fname ? ` · ${list.length} ${fname}` : "") +
+  } else $("#pan-s").textContent = (allMyth ? `${scope.length} voci · ${scope.filter(isOn).length} attive sul tuo PC` : `${scope.filter((t) => isOn(t) && t.kind !== "myth").length} applicate su ${sTot}`) + (fname ? ` · ${list.length} ${fname}` : "") +
     (S.twCat === "Sicurezza" ? " · voci pericolose: chiedono una conferma prima di essere applicate" : "");
   const groups = {};
   /* overlay: prima quelli che girano adesso, poi accesi, da controllare, spenti; poi le voci di Windows */
@@ -741,7 +744,7 @@ function renderTweaks() {
   const multi = !S.twCat;
   const ovBox = S.twCat === OV_CAT ? overlayBox() : "";
   $("#tw-list").innerHTML = ovBox + ignNote + (list.length ? order.filter((c) => groups[c]).map((c) => `
-    <div class="tw-group">${multi ? `<h3>${esc(c)}</h3>` : ""}
+    <div class="tw-group">${multi ? `<h3>${esc(catName(c))}</h3>` : ""}
     ${groups[c].map(rowHtml).join("")}
     </div>`).join("") : `<div class="empty">${S.filter === "ign" ? "Nessuna voce ignorata." : S.filter === "fix" ? "Niente da correggere qui." : "Nessuna voce con questi filtri."}</div>`);
   $$("#tw-list .tw2[data-id]").forEach((row) => {
@@ -751,17 +754,21 @@ function renderTweaks() {
   $$("[data-sw]").forEach((cb) => cb.addEventListener("change", (e) => {
     const id = cb.dataset.sw, t = tws().find((x) => x.id === id);
     if (!t) return;
+    /* l'interruttore mostra la cosa (acceso = attiva): "applicata" e' il contrario per le voci che spengono qualcosa */
+    const pol = t.kind === "overlay" ? -1 : (t.pol || 1);
+    Object.defineProperty(e, "applied", { value: pol > 0 ? e.target.checked : !e.target.checked });
+    const keep = (applied) => { e.target.checked = pol > 0 ? applied : !applied; };
     if (t.kind === "overlay") {
       if (S.sel.has(id)) S.sel.delete(id);                                   // annullo la selezione
-      else if (t.applied) { e.target.checked = true; return revertIds([id]); }  // riaccendo l'overlay (come prima)
+      else if (t.applied) { keep(true); return revertIds([id]); }  // riaccendo l'overlay (come prima)
       else if (ovOn(t) && !t.ignored && !t.manual) S.sel.add(id);             // da spegnere con Applica
-      else { e.target.checked = true; toast("Questo overlay e' gia' spento: l'hai spento dal suo programma. Per riaccenderlo usa il programma; se lo riaccendi, qui l'interruttore torna spento e potrai rispegnerlo da LagDoctor.", 7000); }
+      else { keep(true); toast("Questo overlay e' gia' spento: l'hai spento dal suo programma. Per riaccenderlo usa il programma; se lo riaccendi, qui l'interruttore torna spento e potrai rispegnerlo da LagDoctor.", 7000); }
       return renderTweaks();
     }
-    if (t.applied) { e.target.checked = true; return revertIds([id]); }
-    if (t.kind === "myth" && t.status === true) { e.target.checked = true; return forceOff(id); }
-    if (!selectable(t)) { e.target.checked = isOn(t); return; }
-    e.target.checked ? S.sel.add(id) : S.sel.delete(id);
+    if (t.applied) { keep(true); return revertIds([id]); }
+    if (t.kind === "myth" && t.status === true) { keep(true); return forceOff(id); }
+    if (!selectable(t)) { keep(isOn(t)); return; }
+    e.applied ? S.sel.add(id) : S.sel.delete(id);
     renderTweaks();
   }));
   $$("[data-how]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); docModal(tws().find((x) => x.id === b.dataset.how)); }));
@@ -772,8 +779,8 @@ function renderTweaks() {
   $$("[data-unign]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); setIgnored(b.dataset.unign, false); }));
   if (S.twCat === OV_CAT) { const rb = $("#ov-refresh"); if (rb) rb.onclick = () => loadOverlays(true); if (!S.ovLoaded) loadOverlays(false); }
   const n = S.sel.size;
-  $("#sel-count").textContent = n ? n + (n === 1 ? " voce selezionata" : " voci selezionate") + ": premi Applica (clicca sul nome di una voce per leggere cosa fa)" : S.twCat === OV_CAT ? "Accendi l'interruttore delle voci che vuoi e premi Applica. Overlay: interruttore acceso = overlay spento."
-    : "Accendi l'interruttore delle voci che vuoi e premi Applica. Clicca sul nome di una voce per leggere cosa fa.";
+  $("#sel-count").textContent = n ? n + (n === 1 ? " voce selezionata" : " voci selezionate") + ": premi Applica (clicca sul nome di una voce per leggere cosa fa)"
+    : "Interruttore acceso = attivo, spento = disattivato. Cambia gli interruttori e premi Applica. Clicca su una voce per leggere cosa fa.";
   $("#apply-btn").disabled = !n;
 }
 /* overlay: cosa gira adesso (si aggiorna ogni volta che apri la categoria) */
@@ -823,14 +830,14 @@ async function applySelected(ids, after) {
   const m = modal(`
     <h2>Applico ${sel.length} modifiche</h2>
     <p class="mut">Prima creo un punto di ripristino di Windows. Ogni modifica si potra' annullare.</p>
-    <ul>${sel.map((t) => `<li>${esc(t.name)} <span class="badge ${riskCls[t.risk]}">${t.risk_label}</span></li>`).join("")}</ul>
+    <ul>${sel.map((t) => `<li>${esc(t.label || t.name)}: <b>${t.kind === "overlay" || (t.pol || 1) < 0 ? "si spegne" : "si accende"}</b> <span class="badge ${riskCls[t.risk]}">${t.risk_label}</span></li>`).join("")}</ul>
     ${sel.some((t) => t.closes) ? `<div class="banner"><b>Programmi che verranno chiusi</b><p>Per cambiare l'impostazione dell'overlay LagDoctor chiude: <b>${[...new Set(sel.filter((t) => t.closes).map((t) => t.closes))].join(", ")}</b>. Se stai giocando o scaricando, finisci prima. Poi riaprili quando vuoi: l'overlay resta spento.</p></div>` : ""}
-    ${dup.length ? `<p class="mut">Alternative tra loro: applico solo la prima di: ${dup.map((g) => g.map((t) => esc(t.name)).join(" / ")).join("; ")}</p>` : ""}
+    ${dup.length ? `<p class="mut">Alternative tra loro: applico solo la prima di: ${dup.map((g) => g.map((t) => esc(t.label || t.name)).join(" / ")).join("; ")}</p>` : ""}
     ${needsPath ? `<div><b>Cartelle dei giochi da escludere da Defender</b>
       <p class="mut" style="margin:4px 0 8px">${libs.length ? "Trovate su tutti i dischi: dai launcher (Steam, Epic, GOG, Xbox, Ubisoft, EA...) e cercando i giochi senza launcher. Togli la spunta a quelle che non vuoi escludere." : "Nessuna cartella di giochi trovata: scrivila qui sotto."}</p>
       ${libHtml}
       <p style="margin-top:8px"><span class="mut">Altre cartelle (facoltativo, separate da ;)</span><br><input type="text" id="def-path" style="width:100%" placeholder="es. D:\\Giochi"></p></div>` : ""}
-    ${risky.length ? `<div class="banner"><b>Modifiche rischiose o pericolose</b>${risky.map((t) => `<p><b>${esc(t.name)}</b>: ${esc(t.warning || "")}</p>`).join("")}
+    ${risky.length ? `<div class="banner"><b>Modifiche rischiose o pericolose</b>${risky.map((t) => `<p><b>${esc(t.label || t.name)}</b>: ${esc(t.warning || "")}</p>`).join("")}
       <p>Scrivi <b>CONFERMO</b> per procedere:</p><input type="text" id="confirm" autocomplete="off"></div>` : ""}
     <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="ghost" id="m-cancel">Annulla</button><button id="m-ok">Applica</button></div>`);
   $("#m-cancel", m).onclick = closeModal;
@@ -876,7 +883,7 @@ function undoDialog() {
   const applied = tws().filter((t) => t.applied);
   if (!applied.length) return toast("LagDoctor non ha applicato nessuna modifica.");
   const m = modal(`<h2>Annulla modifiche di LagDoctor</h2>
-    ${applied.map((t) => `<label class="list-row"><input type="checkbox" value="${t.id}" checked> ${esc(t.name)}</label>`).join("")}
+    ${applied.map((t) => `<label class="list-row"><input type="checkbox" value="${t.id}" checked> ${esc(t.label || t.name)} <span class="mut">· ${(t.pol || 1) > 0 ? "accesa" : "spenta"} da LagDoctor</span></label>`).join("")}
     <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="ghost" id="m-cancel">Chiudi</button><button class="red" id="m-ok">Annulla selezionate</button></div>`);
   $("#m-cancel", m).onclick = closeModal;
   $("#m-ok", m).onclick = () => revertIds($$("input:checked", m).map((i) => i.value));
@@ -1196,10 +1203,10 @@ const GM_GROUPS = [
 ];
 const GM_SHORT = { priority: "Priorita' del gioco", gpu_priority: "Priorita' della scheda video", affinity: "Core del processore scelti da LagDoctor",
   timer: "Timer di sistema a 0,5 ms", qos: "Priorita' di rete al gioco", bg_priority: "Priorita' bassa ai programmi aperti",
-  bg_io: "Priorita' bassa a disco e memoria", vendor_priority: "Programmi del produttore del PC piu' leggeri", eco_bg: "Modalita' efficienza",
-  trim_ram: "Libera la loro RAM", close_onedrive: "OneDrive in pausa", close_apps: "Chiudi componenti inutili",
-  stop_services: "Ferma i servizi non necessari", stop_updates: "Blocca aggiornamenti e download", maintenance: "Manutenzione in pausa",
-  close_shell: "Chiudi Esplora risorse", standby_purge: "Svuota la memoria in standby se la RAM finisce",
+  bg_io: "Priorita' bassa a disco e memoria", vendor_priority: "Priorita' bassa ai programmi del produttore", eco_bg: "Modalita' efficienza",
+  trim_ram: "Pulizia della loro RAM", close_onedrive: "Pausa di OneDrive", close_apps: "Chiusura dei componenti inutili",
+  stop_services: "Stop dei servizi non necessari", stop_updates: "Blocco di aggiornamenti e download", maintenance: "Pausa della manutenzione",
+  close_shell: "Chiusura di Esplora risorse", standby_purge: "Svuotamento della memoria in standby",
   power_plan: "Piano 'Prestazioni eccellenti'", gpu_pref: "Scheda video ad alte prestazioni" };
 const GM_PW = '<path d="M12 3v9"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/>';
 const icoSvg = (d) => `<svg viewBox="0 0 24 24">${d}</svg>`;
@@ -1299,7 +1306,7 @@ function gmOptDialog(o, r) {
   const extra = o.id === "affinity" ? box(`<b>Il tuo processore${cpu}:</b> ${r.cpu ? (r.cpu.apply ? "<b>affinita' utile</b>, verra' applicata. " : "<b>affinita' non utile</b>, non verra' applicata. ") + esc(r.cpu.why || "") : "non leggibile."}`)
     : o.id === "eco_bg" ? box(`<b>Il tuo processore${cpu}:</b> ${r.eco ? (r.eco.apply ? "<b>modalita' efficienza utile</b>, verra' usata. " : "<b>non serve</b>, resta la priorita' bassa. ") + esc(r.eco.why || "") : "non leggibile."}`)
     : o.id === "gpu_pref" ? box(`<b>Schede video di questo PC:</b> ${r.gpus && r.gpus.length ? esc(r.gpus.join(", ")) : "non leggibili"}. ${r.gpus && r.gpus.length >= 2 ? "<b>Due schede video</b>: l'opzione serve." : "<b>Una sola scheda video</b>: anche accesa non fa niente."}`) : "";
-  const m = modal(`<h2>${esc(o.name)}</h2><p>${esc(o.what)}</p>${extra}<p class="mut" style="font-size:13px"><b>Possibili problemi:</b> ${esc(o.risk)}</p>
+  const m = modal(`<h2>${esc(GM_SHORT[o.id] || o.name)}</h2><p>${esc(o.what)}</p>${extra}<p class="mut" style="font-size:13px"><b>Possibili problemi:</b> ${esc(o.risk)}</p>
     ${o.default ? "" : '<p class="mut" style="font-size:12.5px">Facoltativa: spenta all\'inizio, accendila se ti serve.</p>'}
     <div class="row" style="justify-content:flex-end"><button class="ghost" id="m-close">Chiudi</button></div>`);
   $("#m-close", m).onclick = closeModal;
