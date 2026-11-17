@@ -284,14 +284,14 @@ function quando(t) {
 }
 function heroGmHtml(gm) {
   if (!gm) return "";
-  let st, k, t, sub;
-  if (!gm.enabled) { st = "off"; k = "Spenta"; t = "Spenta"; sub = "Accendila: si attiva da sola quando apri un gioco"; }
-  else if (!gm.running) { st = "warn"; t = "Non in esecuzione"; sub = "Apri la pagina Game mode per riavviarla"; }
-  else if (gm.active) { st = "on"; t = esc((gm.games || []).join(", ")); sub = "Attiva: il PC lavora per il gioco"; }
-  else { st = "ready"; t = "Pronta"; sub = `Si attiva da sola quando apri uno dei tuoi ${gm.n_games} giochi`; }
-  return `<div class="hm-gm ${st}"><div class="hm-gmh" data-go="gamemode"><span class="dot"></span>Game mode</div><b data-go="gamemode">${t}</b>
-    ${gm.active ? '<a class="hm-ver" id="home-gm-ver">Verifica ottimizzazioni</a>' : ""}
-    <button class="hm-pw" id="home-gm-pw" title="${gm.enabled ? "Spegni la game mode" : "Accendi la game mode"}">${hsv("power")}</button></div>`;
+  let st, t, sub;
+  if (!gm.enabled) { st = "off"; t = "Accendi"; sub = "Ora e' spenta"; }
+  else if (!gm.running) { st = "warn"; t = "Non in esecuzione"; sub = "Premi per riavviarla"; }
+  else if (gm.active) { st = "on"; t = "Attiva"; sub = esc((gm.games || []).join(", ")); }
+  else { st = "ready"; t = "Accesa"; sub = `Pronta · ${gm.n_games} giochi`; }
+  return `<div class="hm-gm ${st}"><div class="hm-gmh" data-go="gamemode">Game mode</div>
+    <button class="hm-pw" id="home-gm-pw" title="${gm.enabled ? "Spegni la game mode" : "Accendi la game mode"}">${hsv("power")}<span><b>${t}</b><small>${sub}</small></span></button>
+    ${gm.active ? '<a class="hm-ver" id="home-gm-ver">Verifica ottimizzazioni</a>' : ""}</div>`;
 }
 async function home() {
   await refreshState(); await loadCatalog();
@@ -1195,7 +1195,7 @@ const GM_GROUPS = [
   ["Il gioco", "#2ee59d", '<path d="M6 8h12a4 4 0 0 1 4 4v1.5a3.5 3.5 0 0 1-6.3 2.1L14.5 14h-5l-1.2 1.6A3.5 3.5 0 0 1 2 13.5V12a4 4 0 0 1 4-4z"/><path d="M7 10.5v3M5.5 12h3M16 11h.01M18 13h.01"/>',
     ["priority", "gpu_priority", "affinity", "timer", "qos"]],
   ["Programmi in background", "#ffb547", '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 20h10"/><path d="M9 9h6"/>',
-    ["bg_priority", "bg_io", "vendor_priority", "eco_bg", "trim_ram", "close_onedrive"]],
+    ["bg_priority", "bg_io", "vendor_priority", "eco_bg", "trim_ram"]],
   ["Windows", "#38bdf8", '<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/>',
     ["close_apps", "stop_services", "stop_updates", "maintenance", "close_shell"]],
   ["Memoria, energia e scheda video", "#a78bfa", '<rect x="2.5" y="7" width="19" height="10" rx="1.5"/><path d="M6 17v3M10 17v3M14 17v3M18 17v3"/><rect x="6" y="10" width="4" height="4" rx=".5"/><rect x="14" y="10" width="4" height="4" rx=".5"/>',
@@ -1204,7 +1204,7 @@ const GM_GROUPS = [
 const GM_SHORT = { priority: "Priorita' del gioco", gpu_priority: "Priorita' della scheda video", affinity: "Core del processore scelti da LagDoctor",
   timer: "Timer di sistema a 0,5 ms", qos: "Priorita' di rete al gioco", bg_priority: "Priorita' bassa ai programmi aperti",
   bg_io: "Priorita' bassa a disco e memoria", vendor_priority: "Priorita' bassa ai programmi del produttore", eco_bg: "Modalita' efficienza",
-  trim_ram: "Pulizia della loro RAM", close_onedrive: "Pausa di OneDrive", close_apps: "Chiusura dei componenti inutili",
+  trim_ram: "Pulizia della loro RAM", close_apps: "Chiusura dei componenti inutili",
   stop_services: "Stop dei servizi non necessari", stop_updates: "Blocco di aggiornamenti e download", maintenance: "Pausa della manutenzione",
   close_shell: "Chiusura di Esplora risorse", standby_purge: "Svuotamento della memoria in standby",
   power_plan: "Piano 'Prestazioni eccellenti'", gpu_pref: "Scheda video ad alte prestazioni" };

@@ -624,17 +624,6 @@ nav a i svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.
 .hm-k svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
 .hm-t1{font-size:24px;font-weight:700;margin:3px 0 6px}.hm-s{color:var(--mut);font-size:13.5px;line-height:1.5}
 .hm-btns{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}.hm-btns button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;margin-right:8px;vertical-align:-3px}
-.hm-gm{position:relative;width:220px;padding:16px 18px;border-radius:16px;background:rgba(0,0,0,.18);box-shadow:inset 0 0 0 1px var(--line2);align-self:stretch;display:flex;flex-direction:column;justify-content:center}
-.hm-gmh{display:flex;align-items:center;gap:8px;color:var(--mut);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;cursor:pointer}
-.hm-gm .dot{width:8px;height:8px;border-radius:50%;background:var(--mut)}
-.hm-gm.ready .dot{background:var(--a2);box-shadow:0 0 8px var(--a2)}.hm-gm.on .dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}.hm-gm.warn .dot{background:var(--warn)}
-.hm-gm b{display:block;font-size:19px;margin:6px 0 3px;cursor:pointer;padding-right:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hm-gm small{color:var(--mut);font-size:12.5px;line-height:1.4;display:block;padding-right:40px}
-.hm-ver{color:var(--a2);font-size:12.5px;cursor:pointer;margin-top:6px}
-.hm-pw{position:absolute;right:14px;bottom:14px;width:36px;height:36px;border-radius:50%;padding:0;display:grid;place-items:center;background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1px var(--line2)}
-.hm-pw svg{width:17px;height:17px;fill:none;stroke:var(--mut);stroke-width:2.6;stroke-linecap:round}
-.hm-gm.ready .hm-pw{background:linear-gradient(135deg,#7c5cff,#00d4ff);box-shadow:none}.hm-gm.on .hm-pw{background:linear-gradient(135deg,#2ee59d,#00d4ff);box-shadow:none}
-.hm-gm.ready .hm-pw svg,.hm-gm.on .hm-pw svg{stroke:#061018}
 .hm-sec{display:flex;align-items:baseline;gap:10px;margin:0 0 12px}.hm-sec h2{margin:0;font-size:17px;text-transform:none;letter-spacing:0;color:var(--fg)}.hm-sec .mut{font-size:12.5px}
 .hm-probs{margin-bottom:30px}
 .hm-ms{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:26px;margin-bottom:10px}
@@ -660,3 +649,17 @@ nav a i svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.
 .sd-row input[type=range]{flex:1;max-width:320px;accent-color:var(--a2);cursor:pointer}
 .sd-row b{min-width:90px;font-size:14px}
 .doc3 .tech{color:var(--mut);font-size:12.5px;margin-top:3px}
+
+.hm-gm{width:250px;align-self:center;display:flex;flex-direction:column;gap:10px}
+.hm-gmh{color:var(--mut);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;cursor:pointer}
+.hm-pw{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;border-radius:14px;text-align:left;color:var(--fg);background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px var(--line2)}
+.hm-pw:hover{background:rgba(255,255,255,.09)}
+.hm-pw svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;flex:none}
+.hm-pw span{min-width:0}.hm-pw b{display:block;font-size:15px}
+.hm-pw small{display:block;font-size:12px;color:var(--mut);margin-top:2px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hm-gm.ready .hm-pw{background:linear-gradient(135deg,rgba(124,92,255,.35),rgba(0,212,255,.25));box-shadow:inset 0 0 0 1px rgba(0,212,255,.5)}
+.hm-gm.on .hm-pw{background:linear-gradient(135deg,rgba(46,229,157,.3),rgba(0,212,255,.22));box-shadow:inset 0 0 0 1px rgba(46,229,157,.55)}
+.hm-gm.ready .hm-pw small,.hm-gm.on .hm-pw small{color:#bfefff}
+.hm-gm.warn .hm-pw{box-shadow:inset 0 0 0 1px rgba(255,181,71,.5)}.hm-gm.warn .hm-pw small{color:var(--warn)}
+.hm-ver{color:var(--a2);font-size:12.5px;cursor:pointer}
+@media (max-width:1100px){.hm-gm{width:auto}}

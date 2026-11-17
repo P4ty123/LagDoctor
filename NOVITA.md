@@ -1,3 +1,9 @@
+## LagDoctor 5.25.32
+
+- Panoramica: la game mode ha un tasto grande al posto del riquadro: "Accendi" quando e' spenta, "Accesa · Pronta"
+  quando aspetta un gioco, "Attiva" con il nome del gioco mentre giochi.
+- Game mode: tolta la "Pausa di OneDrive", OneDrive non viene piu' chiuso durante il gioco.
+
 ## LagDoctor 5.25.31
 
 - Nomi piu' chiari in Ottimizzazioni: "Frame preparati in anticipo", "Limite FPS per G-SYNC" / "per FreeSync",

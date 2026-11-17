@@ -5,7 +5,7 @@ e' partito uno dei giochi scelti. Quando un gioco parte:
   - priorita' CPU e GPU del gioco piu' alte (Alta o Superiore al normale, scelta per ogni gioco)
   - priorita' piu' bassa per i programmi in background dell'utente (non per chat vocale, overlay, launcher...)
   - chiude componenti di Windows inutili mentre giochi, come fa la modalita' Xbox (widget, Collegamento al
-    telefono, aggiornamenti di Edge/Google, OneDrive), e facoltativamente anche Esplora risorse
+    telefono, aggiornamenti di Edge/Google), e facoltativamente anche Esplora risorse
   - ferma servizi non necessari (indicizzazione, SysMain, telemetria, Windows Update e download in background)
   - libera la RAM dei programmi in background, timer di sistema a 0,5 ms, rete: pacchetti del gioco in priorita'
 Quando l'ultimo gioco si chiude, TUTTO torna esattamente com'era. Ogni modifica viene scritta prima in un
@@ -87,9 +87,6 @@ OPTIONS = [
      "Chiude Widget, Collegamento al telefono, Copilot e gli aggiornamenti automatici di Edge/Google. La "
      "modalita' Xbox di Windows libera RAM proprio non caricando questi componenti.",
      "Nessuno: Windows li riapre da solo quando servono."),
-    ("close_onedrive", True, "Metti in pausa OneDrive",
-     "OneDrive viene chiuso durante il gioco (niente sincronizzazioni che usano disco e rete) e riaperto alla fine.",
-     "I file non si sincronizzano mentre giochi."),
     ("stop_services", True, "Ferma i servizi non necessari",
      "Ferma temporaneamente indicizzazione della ricerca, SysMain (Superfetch), telemetria, segnalazione errori, "
      "mappe offline. Ripartono quando chiudi il gioco.",
@@ -970,8 +967,6 @@ class Engine:
         targets = set()
         if opts.get("close_apps"):
             targets.update(APPS)
-        if opts.get("close_onedrive"):
-            targets.add("onedrive.exe")
         if opts.get("close_shell"):
             targets.update(SHELL)
         targets.update(_blocked_overlays())  # overlay spenti da LagDoctor (Ottimizzazioni > Overlays)
@@ -1772,7 +1767,7 @@ def verify():
     for n in j.get("closed") or []:
         back = n in names_running
         add("App chiuse", n, True if not back else None, "chiuso" if not back else "riaperto da Windows (usa poca CPU)")
-    if (opts.get("close_apps") or opts.get("close_onedrive") or opts.get("close_shell")) and not j.get("closed"):
+    if (opts.get("close_apps") or opts.get("close_shell")) and not j.get("closed"):
         add("App chiuse", "Componenti di Windows", True, "nessuno era aperto")
     # ---------------- programmi in background (raggruppati per nome)
     if opts.get("bg_priority") or opts.get("vendor_priority"):
