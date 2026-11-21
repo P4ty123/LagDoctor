@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 
+from . import schedtask
 from . import tweaks as T
 from .tweaks import DWORD, SZ, CmdTweak, RegTweak, Tweak, ps, run
 
@@ -217,6 +218,7 @@ class TimerResTweak(Tweak):
                          "/SC", "ONLOGON", "/RL", "HIGHEST", "/F"])
         if code != 0:
             raise RuntimeError("non riesco a creare l'attivita' all'avvio: " + out[-200:])
+        schedtask.fix(TIMER_TASK)
         subprocess.Popen(cmd, creationflags=0x08000000 | 0x00000008)  # nessuna finestra, staccato
         return {"global_prev": prev}
 
@@ -241,7 +243,8 @@ def repair_timer():
     t = TIMER[0]
     cmd = t._cmd()
     from . import paths
-    run(["schtasks", "/Create", "/TN", TIMER_TASK, "/TR", paths.quote(cmd), "/SC", "ONLOGON", "/RL", "HIGHEST", "/F"])
+    if run(["schtasks", "/Create", "/TN", TIMER_TASK, "/TR", paths.quote(cmd), "/SC", "ONLOGON", "/RL", "HIGHEST", "/F"])[0] == 0:
+        schedtask.fix(TIMER_TASK)
     return True
 
 

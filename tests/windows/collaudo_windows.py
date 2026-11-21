@@ -228,6 +228,26 @@ def f_autostart_attivita():
         T.run(["schtasks", "/Delete", "/TN", nome, "/F"])
 
 
+@prova("Attivita' di LagDoctor: partono a batteria, non si fermano staccando la corrente ne' dopo 3 giorni")
+def f_attivita_batteria():
+    from lagdoctor import schedtask
+    nome = "LagDoctorCollaudoBatteria"
+    T.run(["schtasks", "/Create", "/TN", nome, "/TR", r"C:\Windows\System32\cmd.exe /c exit", "/SC", "ONLOGON",
+           "/RL", "HIGHEST", "/F"])
+    try:
+        leggi = lambda: T.ps("$s = (Get-ScheduledTask -TaskPath '\\' -TaskName '%s').Settings; "
+                             "'{0}|{1}|{2}|{3}|{4}' -f $s.DisallowStartIfOnBatteries, $s.StopIfGoingOnBatteries, "
+                             "$s.ExecutionTimeLimit, $s.RestartCount, $s.RestartInterval" % nome)[1].strip()
+        prima = leggi()
+        print("   impostazioni normali di schtasks:", prima)
+        assert schedtask.fix(nome), "impostazioni non cambiate"
+        dopo = leggi()
+        print("   dopo LagDoctor:", dopo)
+        assert dopo == "False|False|PT0S|3|PT1M", dopo
+    finally:
+        T.run(["schtasks", "/Delete", "/TN", nome, "/F"])
+
+
 @prova("Game mode: manutenzione di Windows sospesa e rimessa com'era")
 def f_manutenzione():
     from lagdoctor import gamemode as G

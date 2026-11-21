@@ -26,7 +26,7 @@ import psutil
 from . import cputopo
 from . import games as G
 
-from . import paths
+from . import paths, schedtask
 
 ROOT = paths.DATA_DIR
 CONFIG = os.path.join(ROOT, "gamemode.json")
@@ -505,6 +505,7 @@ def launch_as_user(exe, args="", fast=False):
     code, out = _run(["schtasks", "/Create", "/TN", LAUNCH_TASK, "/TR", tr, "/SC", "ONCE", "/ST", "23:59",
                       "/RL", "LIMITED", "/F"])
     if code == 0:
+        schedtask.fix(LAUNCH_TASK, restart=False)  # altrimenti a batteria Windows non la avvia
         ok = _run(["schtasks", "/Run", "/TN", LAUNCH_TASK])[0] == 0
         if fast:
             threading.Timer(5, lambda: _run(["schtasks", "/Delete", "/TN", LAUNCH_TASK, "/F"])).start()
@@ -1551,6 +1552,7 @@ def enable():
                       "/SC", "ONLOGON", "/RL", "HIGHEST", "/F"])
     if code != 0:
         raise RuntimeError("non riesco a creare l'avvio automatico: " + out[-200:])
+    schedtask.fix(TASK)  # parte anche a batteria, non viene chiusa staccando la corrente ne' dopo 3 giorni
     if not daemon_pid():
         subprocess.Popen(cmd, creationflags=CREATE_NO_WINDOW | 0x00000008, cwd=paths.APP_DIR)
     return True
@@ -1622,7 +1624,8 @@ def ensure_running():
     if not c.get("enabled"):
         return False
     cmd = paths.gui_cmd("--gamemode")
-    _run(["schtasks", "/Create", "/TN", TASK, "/TR", paths.quote(cmd), "/SC", "ONLOGON", "/RL", "HIGHEST", "/F"])
+    if _run(["schtasks", "/Create", "/TN", TASK, "/TR", paths.quote(cmd), "/SC", "ONLOGON", "/RL", "HIGHEST", "/F"])[0] == 0:
+        schedtask.fix(TASK)
     if not daemon_pid():
         subprocess.Popen(cmd, creationflags=CREATE_NO_WINDOW | 0x00000008, cwd=paths.APP_DIR)
     return True

@@ -1,3 +1,11 @@
+## LagDoctor 5.25.33
+
+- Game mode (e avvio con Windows, Timer Resolution, blocco degli overlay): le attivita' di Windows create da
+  LagDoctor ora partono anche a batteria, non vengono chiuse staccando il caricatore e non hanno piu' il limite
+  di 3 giorni. Prima, su un portatile a batteria la game mode non partiva da sola, e su un PC mai riavviato
+  Windows la chiudeva dopo 72 ore. Se il programma invisibile si chiude per un errore, Windows lo fa ripartire.
+  Le attivita' gia' create vengono sistemate alla prima apertura di LagDoctor.
+
 ## LagDoctor 5.25.32
 
 - Panoramica: la game mode ha un tasto grande al posto del riquadro: "Accendi" quando e' spenta, "Accesa · Pronta"

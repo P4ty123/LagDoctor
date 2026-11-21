@@ -3,7 +3,7 @@ import json
 import os
 import subprocess
 
-from . import paths
+from . import paths, schedtask
 
 FILE = paths.data("impostazioni.json")
 TASK = "LagDoctor Avvio"
@@ -57,6 +57,7 @@ def apply(d):
                           "/RL", "HIGHEST", *(["/DELAY", "%04d:%02d" % (delay // 60, delay % 60)] if delay else []), "/F"])
         if code != 0:
             raise RuntimeError("non riesco a creare l'avvio con Windows: " + out[-200:])
+        schedtask.fix(TASK, restart=False)  # a batteria deve partire lo stesso; niente limite di 3 giorni
     else:
         _run(["schtasks", "/Delete", "/TN", TASK, "/F"])
     save(d)

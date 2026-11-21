@@ -24,7 +24,7 @@ import subprocess
 import threading
 import time
 
-from . import tweak_docs
+from . import schedtask, tweak_docs
 from . import tweaks as T
 
 CAT = "Overlays"
@@ -536,6 +536,8 @@ def guard_install(start=True):
     cmd = paths.gui_cmd(GUARD_ARG)
     code, out = _run(["schtasks", "/Create", "/TN", GUARD_TASK, "/TR", paths.quote(cmd), "/SC", "ONLOGON",
                       "/RL", "HIGHEST", "/F"])
+    if code == 0:
+        schedtask.fix(GUARD_TASK)
     if start and not _guard_pids():
         subprocess.Popen(cmd, close_fds=True, creationflags=CREATE_NO_WINDOW | 0x00000008)
     return code == 0
