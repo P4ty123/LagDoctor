@@ -432,7 +432,7 @@ def main():
     for t in sorted(T.for_vendor(None), key=lambda x: (T.CAT_ORDER.index(x.cat) if x.cat in T.CAT_ORDER else 99, x.id)):
         collauda_voce(t)
     sintassi_powershell()
-    for f in (f_autostart_lettura, f_autostart_servizio, f_autostart_attivita, f_manutenzione, f_autorestart, f_timer,
+    for f in (f_autostart_lettura, f_autostart_servizio, f_autostart_attivita, f_attivita_batteria, f_manutenzione, f_autorestart, f_timer,
               f_cpu, f_verifica, f_icone, f_giochi_aperti):
         f()
     fixpc_veri()  # per ultimo: toglie la console a questo processo, come nell'exe di LagDoctor
