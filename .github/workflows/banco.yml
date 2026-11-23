@@ -13,7 +13,7 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install psutil==7.0.0
       - name: Banco di prova
-        run: python tests/banco/banco.py
+        run: python tests/banco/banco2.py
       - if: always()
         uses: actions/upload-artifact@v4
         with:

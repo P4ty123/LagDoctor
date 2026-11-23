@@ -1193,7 +1193,7 @@ class Engine:
             prev = p.nice()
             if prev != 0x20:  # solo quelli a priorita' Normale
                 return False
-            p.nice(0x4000)    # BELOW_NORMAL
+            p.nice(getattr(self, "_bg_class", 0x4000))  # SOLO BANCO DI PROVA: classe scelta nelle opzioni
             rec = [p.create_time(), prev, p.info.get("name") or p.name(), None, None, vendor, False]
             if getattr(self, "_eco_on", False) and _eco(p.pid, True):
                 rec[6] = True
@@ -1212,6 +1212,7 @@ class Engine:
         opts = opts or DEFAULT_OPTS
         io_mem = bool(opts.get("bg_io"))
         self._eco_on = bool(opts.get("eco_bg")) and bool(self.eco.get("apply"))
+        self._bg_class = int(opts.get("bg_class") or 0x4000)
         changed = 0
         if opts.get("bg_priority"):
             for p in self._user_bg(only_new=True):
