@@ -66,6 +66,7 @@ def main():
     cores = os.cpu_count()
     print("Processori logici:", cores)
 
+    os.makedirs(paths.DATA_DIR, exist_ok=True)
     c = GM.load_config(); c["enabled"] = True
     g = dict(games.manual(GAME_ON), on=True, priority="high")
     c["games"] = [g]; GM.save_config(c)
