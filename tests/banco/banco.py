@@ -45,6 +45,15 @@ def run_game(exe, tag, i, gm):
         while time.time() - t0 < 15 and not status().get("active"):
             time.sleep(0.5)
         note = "game mode attiva dopo %.1fs" % (time.time() - t0) if status().get("active") else "GAME MODE NON ATTIVA"
+        import psutil
+        while time.time() - t0 < 20:
+            try:
+                if psutil.Process(p.pid).nice() == psutil.HIGH_PRIORITY_CLASS:
+                    note += ", gioco a priorita' Alta dopo %.1fs" % (time.time() - t0)
+                    break
+            except psutil.Error:
+                break
+            time.sleep(0.25)
     else:
         time.sleep(3)
         note = "game mode attiva (sbagliato!)" if status().get("active") else "game mode non attiva"
