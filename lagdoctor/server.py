@@ -273,8 +273,9 @@ def _gm_quick():
 def gamemode_json(scan=False):
     c = gamemode.load_config()
     added = None
-    if scan or not c["games"]:
+    if scan or not c["games"] or c.get("scan_ver", 0) < gamemode.SCAN_VER:
         added = gamemode.refresh_games(c)
+        c["scan_ver"] = gamemode.SCAN_VER  # versione nuova con piu' giochi riconosciuti: una ricerca automatica
         gamemode.save_config(c)
         if scan:
             gameicons.forget_failed()  # "Cerca di nuovo": si riprova anche con le icone non trovate

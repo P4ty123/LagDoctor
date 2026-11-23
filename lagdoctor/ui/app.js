@@ -823,7 +823,7 @@ async function applySelected(ids, after) {
     try { libs = (await api("/api/defender_folders")).items || []; } catch (e) { libs = []; }
     $("#toast").hidden = true;
   }
-  const srcName = { steam: "Steam", epic: "Epic", gog: "GOG", xbox: "Xbox", ubisoft: "Ubisoft", pc: "launcher", disco: "trovato sul disco" };
+  const srcName = { steam: "Steam", epic: "Epic", gog: "GOG", xbox: "Xbox", ubisoft: "Ubisoft", pc: "launcher", disco: "trovato sul disco", emulatore: "Emulatore" };
   const libHtml = libs.map((l, i) => `<label class="def-lib"><input type="checkbox" class="def-cb" data-i="${i}" ${l.excluded ? "checked disabled" : "checked"}>
       <span><b>${esc(l.path)}</b> <span class="mut">${l.drive ? "disco " + esc(l.drive) + " · " : ""}${l.games.length} ${l.games.length === 1 ? "gioco" : "giochi"}${(l.sources || []).length ? " · " + l.sources.map((s) => srcName[s] || s).join(", ") : ""}${l.excluded ? " · gia' esclusa" : ""}</span><br>
       <span class="mut" style="font-size:12px">${esc(l.games.slice(0, 6).join(", "))}${l.games.length > 6 ? ", ..." : ""}</span></span></label>`).join("");
@@ -1171,7 +1171,7 @@ async function startupProcesses() {
 }
 
 /* ------------------------------------------------------------------ GAME MODE */
-const GM_SRC = { steam: "Steam", epic: "Epic Games", gog: "GOG", xbox: "Xbox / Game Pass", ubisoft: "Ubisoft", pc: "Installato", java: "Java", manuale: "aggiunto da te" };
+const GM_SRC = { steam: "Steam", epic: "Epic Games", gog: "GOG", xbox: "Xbox / Game Pass", ubisoft: "Ubisoft", pc: "Installato", java: "Java", manuale: "aggiunto da te", emulatore: "Emulatore" };
 /* icona di un gioco: logo del gioco (se e' nell'elenco dei famosi) > icona vera dal suo .exe > logo dello studio > lettera */
 const OWN_LOGOS = new Set(["counterstrike", "fortnite", "valorant", "leagueoflegends", "dota2", "pubg", "roblox", "fifa", "vrchat", "osu", "fivem"]);
 function gameLogo(name) {

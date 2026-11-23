@@ -1,3 +1,11 @@
+## LagDoctor 5.25.35
+
+- Game mode: riconosce gli emulatori come giochi: PCSX2, RPCS3, DuckStation, PPSSPP, Dolphin, Cemu, Ryujinx,
+  Xenia, xemu, RetroArch, shadPS4, Azahar/Citra, melonDS e Vita3K. Li trova installati, dal collegamento nel
+  menu Start o sul desktop, o dalla cartella dei dati (anche le versioni portatili); durante il gioco li riconosce
+  dal nome del programma, ovunque sia. Anche in Analizza gioco.
+- Dopo l'aggiornamento la lista dei giochi si aggiorna da sola una volta (senza premere "Cerca di nuovo").
+
 ## LagDoctor 5.25.34
 
 - Game mode piu' rapida: si attiva circa 1 secondo dopo l'avvio del gioco (prima fino a 13 secondi). Ogni secondo

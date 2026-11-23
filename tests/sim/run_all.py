@@ -25,6 +25,7 @@ PROVE = [
     ("t_gm_new.py", "game mode: manutenzione, scheda video preferita, memoria standby"),
     ("t_shell.py", "game mode: Esplora risorse chiuso e riaperto"),
     ("t_autostart2.py", "processi in background all'avvio"),
+    ("t_emulatori.py", "emulatori riconosciuti come giochi (PCSX2, RPCS3, DuckStation...)"),
     ("t_cputopo.py", "processori: affinita' dei core"),
     ("t_eco.py", "processori: modalita' efficienza"),
     ("t_fixpc.py", "Fix PC: catalogo dei comandi ed esecuzione"),

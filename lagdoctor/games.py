@@ -227,10 +227,87 @@ def minecraft():
     return games
 
 
+# ---------------------------------------------------------------- emulatori
+# (nome, eseguibili, parole nel nome del programma installato / del collegamento, cartelle dei dati in APPDATA,
+#  LOCALAPPDATA o Documenti). Molti emulatori sono "portatili" (una cartella scompattata, nessuna installazione): li
+# trovo anche dai dati che creano al primo avvio e dai collegamenti nel menu Start o sul desktop. Il riconoscimento
+# durante il gioco e' per nome dell'eseguibile: funziona ovunque sia la cartella.
+EMULATORS = [
+    ("PCSX2", ["pcsx2-qt.exe", "pcsx2.exe", "pcsx2-qtx64.exe", "pcsx2-qtx64-avx2.exe", "pcsx2x64.exe",
+               "pcsx2x64-avx2.exe", "pcsx2-avx2.exe"], r"pcsx2", ["PCSX2"]),
+    ("RPCS3", ["rpcs3.exe"], r"rpcs3", ["RPCS3"]),
+    ("DuckStation", ["duckstation-qt-x64-releaseltcg.exe", "duckstation-qt-arm64-releaseltcg.exe", "duckstation-qt.exe",
+                     "duckstation.exe"], r"duckstation", ["DuckStation"]),
+    ("PPSSPP", ["ppssppwindows64.exe", "ppssppwindows.exe", "ppssppwindowsarm64.exe"], r"ppsspp", ["PPSSPP"]),
+    ("Dolphin", ["dolphin.exe"], r"dolphin emulator|\bdolphin\b", ["Dolphin Emulator"]),
+    ("Cemu", ["cemu.exe"], r"\bcemu\b", ["Cemu"]),
+    ("Ryujinx", ["ryujinx.exe"], r"ryujinx", ["Ryujinx"]),
+    ("Xenia", ["xenia.exe", "xenia_canary.exe"], r"xenia", ["Xenia"]),
+    ("xemu", ["xemu.exe"], r"\bxemu\b", ["xemu"]),
+    ("RetroArch", ["retroarch.exe"], r"retroarch", ["RetroArch"]),
+    ("shadPS4", ["shadps4.exe"], r"shadps4", ["shadPS4"]),
+    ("Azahar / Citra", ["azahar.exe", "citra-qt.exe", "lime3ds.exe", "lime3ds-gui.exe"], r"azahar|citra|lime3ds",
+     ["Azahar", "Citra", "Lime3DS"]),
+    ("melonDS", ["melonds.exe"], r"melonds", ["melonDS"]),
+    ("Vita3K", ["vita3k.exe"], r"vita3k", ["Vita3K"]),
+]
+
+
+def _shortcut_names():
+    names = []
+    dirs = [os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs"),
+            os.path.join(os.environ.get("ProgramData", r"C:\ProgramData"), r"Microsoft\Windows\Start Menu\Programs"),
+            os.path.join(os.environ.get("USERPROFILE", ""), "Desktop"), os.path.join(os.environ.get("PUBLIC", ""), "Desktop"),
+            os.path.join(os.environ.get("USERPROFILE", ""), "OneDrive", "Desktop")]
+    for d in dirs:
+        if not os.path.isdir(d):
+            continue
+        for root, sub, files in os.walk(d):
+            if root.count(os.sep) - d.count(os.sep) >= 2:
+                sub[:] = []
+            names += [f[:-4] for f in files if f.lower().endswith(".lnk")]
+    return names
+
+
+def emulators():
+    """Emulatori installati o usati su questo PC (PCSX2, RPCS3, Dolphin...)."""
+    found = []
+    progs = []  # (nome, cartella) dai programmi installati
+    if winreg is not None:
+        for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+            for base in (r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                         r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"):
+                for k in _subkeys(root, base):
+                    name = _reg(root, base + "\\" + k, "DisplayName") or ""
+                    if name:
+                        progs.append((name, (_reg(root, base + "\\" + k, "InstallLocation") or "").strip('"')))
+    try:
+        links = _shortcut_names()
+    except Exception:
+        links = []
+    homes = [os.environ.get("APPDATA", ""), os.environ.get("LOCALAPPDATA", ""),
+             os.path.join(os.environ.get("USERPROFILE", ""), "Documents"),
+             os.path.join(os.environ.get("USERPROFILE", ""), "OneDrive", "Documents")]
+    for name, exes, words, datadirs in EMULATORS:
+        rx = re.compile(words, re.I)
+        loc = next((l for n, l in progs if rx.search(n)), None)
+        hit = loc is not None or any(rx.search(n) for n in links) or \
+            any(h and os.path.isdir(os.path.join(h, d)) for h in homes for d in datadirs)
+        if not hit:
+            continue
+        g = dict(id=_id("emu", name), name=name, source="emulatore", dir="", match="name", exe_names=list(exes))
+        if loc and os.path.isdir(loc):  # l'eseguibile vero (per l'icona)
+            exe = next((os.path.join(loc, e) for e in exes if os.path.isfile(os.path.join(loc, e))), None)
+            if exe:
+                g["exe"] = exe
+        found.append(g)
+    return found
+
+
 def detect():
     """Tutti i giochi trovati, senza doppioni (stessa cartella)."""
     found, seen = [], set()
-    for fn in (steam, epic, gog, xbox, ubisoft, installed_programs, minecraft):
+    for fn in (steam, epic, gog, xbox, ubisoft, installed_programs, minecraft, emulators):
         try:
             items = fn()
         except Exception:

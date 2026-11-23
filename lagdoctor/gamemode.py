@@ -39,6 +39,7 @@ LOG = os.path.join(ROOT, "gamemode.log")
 TASK = "LagDoctor GameMode"
 LAUNCH_TASK = "LagDoctor Avvio utente"
 CREATE_NO_WINDOW = 0x08000000
+SCAN_VER = 2  # aumentare quando si riconoscono giochi nuovi (2 = emulatori): la lista si aggiorna da sola una volta
 POLL = 5.0  # secondi tra un controllo completo e l'altro dei processi aperti
 QUICK = 1.0  # ogni secondo: controllo leggero dei soli processi nuovi (per attivarsi appena parte un gioco)
 GRACE = 6.0  # secondi senza giochi prima di spegnere (alcuni giochi si riavviano da soli all'avvio)
