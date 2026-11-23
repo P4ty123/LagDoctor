@@ -1,3 +1,11 @@
+## LagDoctor 5.25.34
+
+- Game mode piu' rapida: si attiva circa 1 secondo dopo l'avvio del gioco (prima fino a 13 secondi). Ogni secondo
+  guarda solo i programmi appena aperti (costa quasi zero); il controllo completo resta ogni 5 secondi.
+- Prima le cose che contano: subito i programmi in background abbassati, la priorita' Alta al gioco appena finita
+  l'attesa per l'anti-cheat (8 secondi), e solo dopo le operazioni lente (servizi, manutenzione, RAM).
+  Banco di prova su Windows con programmi in background al 100%: 1% low da 26 a 105 FPS, frame peggiore da 67 a 10 ms.
+
 ## LagDoctor 5.25.33
 
 - Game mode (e avvio con Windows, Timer Resolution, blocco degli overlay): le attivita' di Windows create da

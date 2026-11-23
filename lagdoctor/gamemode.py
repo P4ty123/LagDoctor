@@ -39,7 +39,8 @@ LOG = os.path.join(ROOT, "gamemode.log")
 TASK = "LagDoctor GameMode"
 LAUNCH_TASK = "LagDoctor Avvio utente"
 CREATE_NO_WINDOW = 0x08000000
-POLL = 5.0  # secondi tra un controllo e l'altro dei processi aperti
+POLL = 5.0  # secondi tra un controllo completo e l'altro dei processi aperti
+QUICK = 1.0  # ogni secondo: controllo leggero dei soli processi nuovi (per attivarsi appena parte un gioco)
 GRACE = 6.0  # secondi senza giochi prima di spegnere (alcuni giochi si riavviano da soli all'avvio)
 SHELL_GRACE = 1.5  # Esplora risorse invece torna appena il gioco si chiude
 AC_WAIT = 8.0  # secondi di attesa prima di toccare un gioco nuovo (per vedere se parte un anti-cheat)
@@ -826,6 +827,7 @@ class Engine:
         self.my_user = None
         self.bg_seen = {}  # pid -> create_time gia' valutati (per non rileggere tutto a ogni controllo)
         self.new_ac_exes = []  # (id gioco, exe, anti-cheat) da salvare nella configurazione
+        self.slow_pending = None  # opzioni della parte lenta ancora da fare (servizi, manutenzione...)
         self.game_seen = set()  # pid dei giochi gia' visti (anche durante l'attesa per l'anti-cheat)
         try:
             self.cpu = cputopo.decide()
@@ -877,6 +879,9 @@ class Engine:
             self.j["timer"] = True
             self._jsave()
             self.act("Timer di sistema a 0,5 ms")
+
+    def activate_slow(self, opts):
+        """La parte lenta (PowerShell, servizi): dopo aver gia' dato la precedenza al gioco."""
         svcs = []
         for k in ("stop_services", "stop_updates"):
             if opts.get(k):
@@ -1246,6 +1251,7 @@ class Engine:
         return launched
 
     def deactivate(self, reason="nessun gioco aperto"):
+        self.slow_pending = None
         if self.j is None:
             return
         j = self.j
@@ -1334,6 +1340,7 @@ class Watcher:
         self.cfg, self.cfg_mtime = load_config(), None
         self.cache = {}  # pid -> (create_time, game or None)
         self.last_seen = 0
+        self.known_pids = set()
         self.stop = threading.Event()
         self.last_status = 0
 
@@ -1426,7 +1433,12 @@ class Watcher:
             self.last_seen = time.time()
             if not e.active:
                 e.activate(opts, sorted({g["name"] for _, g in running.values()}))
+                e.game_seen = set(running)
+                if opts.get("bg_priority") or opts.get("vendor_priority"):
+                    e.lower_background(opts)  # subito: e' quello che libera il processore per il gioco
                 self.write_status([], force=True)
+                e.slow_pending = opts  # la parte lenta dopo, quando il gioco ha gia' la priorita'
+
             e.game_seen = set(running)  # mai abbassare la priorita' di un gioco, nemmeno nell'attesa iniziale
             for pid, (p, g) in running.items():
                 if pid not in e.game_pids:
@@ -1437,6 +1449,11 @@ class Watcher:
                         continue
                     e.add_game_process(p, g, opts, names)
                     self.write_status([], force=True)
+            if e.slow_pending is not None and (e.game_pids or not any(p for p, _ in running.values()
+                                                                        if self._young(p))):
+                o, e.slow_pending = e.slow_pending, None
+                e.activate_slow(o)  # servizi, manutenzione, RAM: richiedono secondi, ora il gioco e' gia' servito
+                self.write_status([], force=True)
             if e.new_ac_exes:
                 self._remember_ac(e.new_ac_exes)
                 e.new_ac_exes = []
@@ -1459,6 +1476,51 @@ class Watcher:
             self.write_status([], force=True)
         self.write_status([])
 
+    @staticmethod
+    def _young(p):
+        """Gioco partito da meno di AC_WAIT secondi (si aspetta un eventuale anti-cheat prima di toccarlo)."""
+        try:
+            return time.time() - p.create_time() < AC_WAIT
+        except psutil.Error:
+            return False
+
+    def _quick_check(self):
+        """True se serve un controllo completo subito: gioco appena partito, gioco pronto per la priorita'
+        (finita l'attesa dell'anti-cheat), oppure gioco chiuso con Esplora risorse da riaprire."""
+        e = self.engine
+        try:
+            pids = set(psutil.pids())
+        except Exception:
+            return False
+        new = pids - self.known_pids
+        self.known_pids = pids
+        j = e.j
+        if j and j.get("explorer") and not j.get("shell_done"):
+            seen = list(e.game_pids) or list(e.game_seen)
+            if seen and not any(p in pids for p in seen):
+                return True
+        if e.active:
+            now = time.time()
+            for pid in e.game_seen:
+                if pid in pids and pid not in e.game_pids:
+                    try:
+                        if now - psutil.Process(pid).create_time() >= AC_WAIT:
+                            return True
+                    except psutil.Error:
+                        pass
+        if not new:
+            return False
+        games = [g for g in self.cfg["games"] if g.get("on")]
+        if not games:
+            return False
+        for pid in new:
+            try:
+                if self._match(psutil.Process(pid), games):
+                    return True
+            except psutil.Error:
+                pass
+        return False
+
     def run(self):
         log("Game mode avviata (pid %d)" % os.getpid())
         if self.engine.active:  # modifiche rimaste da una sessione interrotta (PC spento, crash)
@@ -1477,17 +1539,14 @@ class Watcher:
                 log("ERRORE nel ciclo: " + traceback.format_exc()[-1500:])
             # con Esplora risorse chiuso, tra un controllo e l'altro guardo ogni secondo (costa quasi zero) se i
             # processi del gioco ci sono ancora: appena chiudi il gioco la barra delle applicazioni torna subito
-            j = self.engine.j
-            if j and j.get("explorer") and not j.get("shell_done"):
-                waited = 0.0
-                while waited < POLL and not self.stop.is_set():
-                    self.stop.wait(1.0)
-                    waited += 1.0
-                    pids = list(self.engine.game_pids) or list(self.engine.game_seen)
-                    if pids and not any(psutil.pid_exists(p) for p in pids):
-                        break
-            else:
-                self.stop.wait(POLL)
+            # tra un controllo completo e l'altro guardo ogni secondo, con una lettura che costa quasi zero (solo i
+            # processi NUOVI), se e' partito un gioco: le ottimizzazioni scattano subito invece che fino a 5 secondi dopo
+            waited = 0.0
+            while waited < POLL and not self.stop.is_set():
+                self.stop.wait(QUICK)
+                waited += QUICK
+                if self._quick_check():
+                    break
         self.engine.deactivate("game mode spenta")
         _save(STATUS, {"pid": None, "updated": time.time(), "active": False, "games": [], "actions": [],
                        "errors": []})
