@@ -1,0 +1,21 @@
+name: Banco di prova game mode
+on:
+  push:
+    branches: [test/banco-gamemode]
+jobs:
+  banco:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install psutil==7.0.0
+      - name: Banco di prova
+        run: python tests/banco/banco.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: banco
+          path: banco/
